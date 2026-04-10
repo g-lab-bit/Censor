@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 # Gas Town: sync beads after every commit
 export PATH="$HOME/go/bin:$HOME/.local/bin:$PATH"
-bd dolt push &
+(bd dolt pull && bd dolt push) &
