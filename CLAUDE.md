@@ -80,6 +80,33 @@ Rapida (host)  ──loads──>  Censor (plugin DLL)
 - Do not add fill tools (fill copy, area calc, revision diff) — those are
   separate Rapida features that consume Censor output later
 
+---
+
+## Spec / Doc Edit Discipline
+
+Docs have no compiler. Specs, CLAUDE.md files, and roadmap/strategy
+documents are the most failure-prone writes in this repo because
+nothing automated tells you when a claim is wrong. When editing
+any such file here, follow the rule:
+
+1. **Grep-verify every factual claim before writing it.** Paste
+   the grep result into chat before the Edit tool call.
+2. **Read the target file's current state.** Do not rely on recall.
+3. **One fix per commit.** Small reviewable diffs.
+4. **Show the diff in chat before push.** Actual `git diff
+   --cached` output, not a summary.
+5. **Post-fix grep must return the expected result.**
+6. **Scope discipline.** Fixes only; drive-by rewrites file a bead.
+
+Particularly relevant here because this CLAUDE.md itself is known
+to contain pre-pivot drift (it still describes Censor as consuming
+Tessera's display list via `tessera_query_elements()`, whereas the
+2026-04-13 pivot moves Censor onto Rapida's `IVectorEngine` C ABI
+shim). When you come to fix that, follow this workflow.
+
+See `~/.claude/projects/-home-giacomo-gt-mayor/memory/feedback_spec_fix_workflow.md`
+for the durable version of the rule.
+
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 ## Beads Issue Tracker
