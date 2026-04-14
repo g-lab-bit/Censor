@@ -4,8 +4,9 @@
 
 Censor is an AEC vector element classifier that ships as an independent plugin
 (DLL). It identifies walls, ducts, pipes, furniture, ceiling grids, and
-user-defined element types from PDF vector primitives provided by Tessera's
-display list.
+user-defined element types from PDF vector primitives that Rapida extracts
+from its active engine (PDFium primary, MuPDF second) and hands across a
+plain C ABI shim.
 
 **Core principle:** AEC drawings encode meaning in geometry. Censor reads that
 geometry directly — no rasterization, no pixel ML. Clean vector features,
@@ -19,15 +20,27 @@ distributed separately.
 ## Architecture
 
 ```
-Rapida (host)  ──loads──>  Censor (plugin DLL)
-       │                          │
-       │                    reads vector data via
-       └──> Tessera ──────> tessera_query_elements() API
+Rapida (host)                            Censor (plugin DLL)
+     │                                         │
+     │  rapida_vector_engine_c.h  (C ABI)      │
+     │ ─────────────────────────────────────>  │
+     │   - enumerate pages / primitives        │
+     │   - host callbacks (log, progress,      │
+     │     cancel, producer metadata)          │
+     │ <─────────────────────────────────────  │
+     │   IVectorEngine handoff back to Censor  │
 ```
 
-- Censor never links Tessera directly. Rapida mediates via host callbacks.
-- Censor is read-only — never modifies Tessera's display list or Rapida's document.
+- Rapida owns the PDF parsing (PDFium/MuPDF). Censor never links libmupdf or
+  libpdfium — it only consumes primitives through the C ABI shim.
+- The boundary is plain C (no C++ symbols across the DLL edge) so Censor can
+  be built with a different compiler/toolchain than Rapida.
+- Censor is read-only — it never mutates Rapida's document state.
+- Censor owns its own spatial index (R-tree via nanoflann, built lazily off
+  the tile hot path) — it does NOT reuse a Rapida/Tessera index.
 - All classification data stored in local SQLite (`%APPDATA%/Censor/censor.db`).
+- On load failure or ABI mismatch, Rapida falls back to rendering without
+  Censor (graceful degradation, per SPEC-censor-integration).
 
 ---
 
@@ -35,13 +48,14 @@ Rapida (host)  ──loads──>  Censor (plugin DLL)
 
 | Decision | Choice | Reason |
 |----------|--------|--------|
-| Language | C++17 internal, C API boundary | Matches Tessera/Rapida pattern |
+| Language | C++17 internal, plain C at DLL boundary | C++ has no stable binary ABI across compilers |
 | Build | CMake | Consistent with stack |
 | Classifier v1 | k-NN cosine similarity | Works with small label counts, no training phase, interpretable |
 | Classifier interface | Swappable (IClassifier) | v2 can be neural net without API change |
 | Storage | SQLite (amalgamation) | Zero external deps, ships inside DLL |
 | Labels | Open string, no enum | Firms have their own vocabulary |
-| Spatial index | Query via Tessera R-tree | Don't duplicate — use the contract API |
+| Spatial index | Own R-tree (nanoflann), lazy | Built on first interactive query, off the tile hot path (SPEC-pivot §6 Phase 3) |
+| Producer metadata | Table copied from Tessera, not code | Static lookup of AutoCAD/Revit/Bluebeam producers |
 | Test framework | Google Test | Standard |
 
 ---
@@ -49,7 +63,8 @@ Rapida (host)  ──loads──>  Censor (plugin DLL)
 ## Build Sequence (gates — don't skip ahead)
 
 1. **Plugin scaffold** — CMake, DLL target, public API header, SQLite
-2. **Tessera contract** — query API in Tessera, Rapida host callbacks
+2. **Rapida C ABI integration** — consume `rapida_vector_engine_c.h`, wire host
+   callbacks (log/progress/cancel/producer), enumerate primitives
 3. **Clustering + features** — spatial grouping, 12-dim feature vector, grid
 4. **Debug overlay** — feature vectors on click, stroke weight bands
 5. **Seeding run** — calibrate constants on real PDFs
@@ -61,18 +76,24 @@ Rapida (host)  ──loads──>  Censor (plugin DLL)
 
 ## Specs
 
-| Spec | Covers |
-|------|--------|
-| SPEC-censor-tessera-contract | Tessera query API — how Censor reads vector data |
-| SPEC-censor-plugin | Plugin architecture — DLL lifecycle, Rapida integration |
-| SPEC-censor-core | Clustering, feature extraction, k-NN, active learning, SQLite |
-| SPEC-censor-ui | Grid overlay, label palette, debug viz, confidence coloring |
+| Spec | Rig | Covers |
+|------|-----|--------|
+| SPEC-censor-integration | Rapida | **Authoritative.** Rapida↔Censor DLL boundary: loading, C ABI shim 6 entry points, host callbacks, IVectorEngine handoff, graceful fallback |
+| SPEC-censor-plugin | Censor | Plugin architecture — DLL lifecycle, internal layout |
+| SPEC-censor-core | Censor | Clustering, feature extraction, k-NN, active learning, SQLite |
+| SPEC-censor-ui | Censor | Grid overlay, label palette, debug viz, confidence coloring |
+
+SPEC-censor-integration lives in the Rapida rig (`Rapida/_Docs/Specs/`) because
+Rapida owns the C ABI header — Censor consumes it. SPEC-censor-tessera-contract
+has been archived (pre-pivot, Tessera is dormant as of `tessera-v0-final`).
 
 ---
 
 ## What NOT to Do
 
-- Do not link Tessera at compile time — use host callbacks only
+- Do not link libmupdf or libpdfium at compile time — consume primitives
+  through `rapida_vector_engine_c.h` only
+- Do not expose C++ symbols across the DLL boundary — plain C or nothing
 - Do not hardcode stroke weight thresholds — learn per drawing
 - Do not use fixed label enums — open string from day one
 - Do not build classifier before debug overlay exists — seeding run needs it
@@ -97,12 +118,6 @@ any such file here, follow the rule:
    --cached` output, not a summary.
 5. **Post-fix grep must return the expected result.**
 6. **Scope discipline.** Fixes only; drive-by rewrites file a bead.
-
-Particularly relevant here because this CLAUDE.md itself is known
-to contain pre-pivot drift (it still describes Censor as consuming
-Tessera's display list via `tessera_query_elements()`, whereas the
-2026-04-13 pivot moves Censor onto Rapida's `IVectorEngine` C ABI
-shim). When you come to fix that, follow this workflow.
 
 See `~/.claude/projects/-home-giacomo-gt-mayor/memory/feedback_spec_fix_workflow.md`
 for the durable version of the rule.
