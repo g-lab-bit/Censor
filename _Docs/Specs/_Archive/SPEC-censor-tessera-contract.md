@@ -1,3 +1,9 @@
+> **SUPERSEDED 2026-04-13 BY PIVOT** — Tessera/Censor contract is obsolete. See `~/gt/Rapida/mayor/rig/_Docs/Specs/SPEC-pivot-2026-04-13.md` for current direction.
+>
+> Post-pivot Censor consumes Rapida's `IVectorEngine` stream directly (PDFium primary, MuPDF second implementation). There is no Tessera contract; Tessera is dormant. Censor remains a DLL plugin, but its data source is the Rapida engine, not Tessera queries. This spec is historical record.
+
+---
+
 # SPEC: Censor ↔ Tessera API Contract
 # Domain: Censor (consumer), Tessera (provider)
 # Phase: v0.1
