@@ -1,7 +1,9 @@
 {
-  "database": "dolt",
   "backend": "dolt",
-  "dolt_mode": "embedded",
-  "dolt_database": "ce",
+  "database": "dolt",
+  "dolt_database": "Censor",
+  "dolt_mode": "server",
+  "dolt_server_host": "127.0.0.1",
+  "dolt_server_port": 3307,
   "project_id": "9228005e-daa0-430f-abc9-e6e03e7fc226"
 }
