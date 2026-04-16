@@ -21,8 +21,6 @@
 
 #include <atomic>
 #include <cstdint>
-#include <cstdio>
-#include <cstring>
 
 /* ---------------------------------------------------------------------------
  * Platform DLL loading shim
@@ -133,18 +131,16 @@ TEST(SmokeDlopen, LoadAndExerciseAllExports)
     ASSERT_NE(fn_attach, nullptr) << "censor_attach_engine symbol not found";
     ASSERT_NE(fn_detach, nullptr) << "censor_detach_engine symbol not found";
 
-    /* 3. ABI version check — major must match.
-     *    Per spec: "host accepts any DLL whose major version matches." */
-    uint32_t dll_ver      = fn_ver();
-    uint32_t header_ver   = CENSOR_ABI_VERSION;
-    uint32_t dll_major    = (dll_ver    >> 16) & 0xFFu;
-    uint32_t header_major = (header_ver >> 16) & 0xFFu;
+    /* 3. ABI version check — same-tree build: DLL and header must match exactly.
+     *    (The spec's looser major-only compatibility rule applies at deployment
+     *    time; in CI we build both from the same source so exact equality is
+     *    the correct gate.) */
+    uint32_t dll_ver    = fn_ver();
+    uint32_t header_ver = CENSOR_ABI_VERSION;
 
     EXPECT_EQ(dll_ver, header_ver)
-        << "Full ABI version mismatch: DLL=0x" << std::hex << dll_ver
+        << "ABI version mismatch: DLL=0x" << std::hex << dll_ver
         << " header=0x" << header_ver;
-    EXPECT_EQ(dll_major, header_major)
-        << "ABI major version mismatch — host and DLL are incompatible";
 
     /* 4. Exercise the full lifecycle. */
     auto cb = make_callbacks();
@@ -165,11 +161,12 @@ TEST(SmokeDlopen, LoadAndExerciseAllExports)
 
     /* censor_shutdown — must not crash, must be idempotent. */
     fn_shut();
-    fn_shut(); /* second call — idempotency check */
+    fn_shut(); /* idempotency: second call must also be safe */
 
-    /* 5. Callback accounting.
-     *    log must have been called at least once (init logs an INFO message).
-     *    on_censor_fatal must have been called exactly once (Phase 3 stub). */
+    /* 5. Callback accounting — checked after both shutdown calls so the counts
+     *    are final (shutdown itself may emit a log, which is fine to include).
+     *    log: at least once (init + attach each log at INFO).
+     *    on_censor_fatal: exactly once (Phase 3 stub fires during attach). */
     EXPECT_GT(g_log_count.load(), 0)
         << "log callback was never called — expected at least one INFO message";
     EXPECT_EQ(g_fatal_count.load(), 1)
