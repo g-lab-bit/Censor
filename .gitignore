@@ -4,6 +4,6 @@
 *.db
 .beads-credential-key
 
-# CMake build output
+# CMake build artifacts
 build/
 cmake-build-*/

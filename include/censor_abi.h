@@ -1,120 +1,139 @@
-// censor_abi.h — Public C ABI for the Censor semantic sidecar DLL.
-//
-// This header defines the six exported entry points and the POD types they
-// use. Rapida includes it when resolving Censor's exported symbols via
-// GetProcAddress / dlsym. Censor includes it when implementing them.
-//
-// ABI discipline: only C types cross the binary boundary. No C++ classes,
-// no STL, no exceptions. The DLL boundary is plain C or nothing.
-//
-// Censor ABI version: 1.0.0 — censor_abi_version() == 0x00010000.
-// Compatibility rule: host accepts any DLL whose major version matches.
+/*
+ * censor_abi.h — Public C ABI for the Censor sidecar DLL.
+ *
+ * Rapida loads censor.dll at startup, resolves these five entry points via
+ * GetProcAddress/dlsym, and drives the lifecycle described in
+ * SPEC-censor-integration.md.
+ *
+ * Rules:
+ *  - All symbols here use C linkage.  No C++ types cross the DLL boundary.
+ *  - Censor must never include anything from Rapida's src/ tree.
+ *  - Engine interaction goes through rapida_vector_engine_c.h only.
+ */
 
 #ifndef CENSOR_ABI_H
 #define CENSOR_ABI_H
 
 #include <stdint.h>
 
-// ---------------------------------------------------------------------------
-// Export / import visibility
-// ---------------------------------------------------------------------------
-
-#ifdef _WIN32
-#  ifdef CENSOR_BUILDING_DLL
-#    define CENSOR_API __declspec(dllexport)
-#  else
-#    define CENSOR_API __declspec(dllimport)
-#  endif
-#else
-#  define CENSOR_API __attribute__((visibility("default")))
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// ---------------------------------------------------------------------------
-// Return codes
-// ---------------------------------------------------------------------------
+/* ---------------------------------------------------------------------------
+ * Version
+ * -------------------------------------------------------------------------*/
 
-#define CENSOR_OK  0   // Success — used by censor_init / censor_attach_engine
+/* ABI version packed as (major << 16) | (minor << 8) | patch.
+ * Rapida's loader accepts any DLL whose major version matches its own.
+ * Minor/patch differences are tolerated under the "add, never remove, never
+ * reorder" discipline.  Initial version: 1.0.0. */
+#define CENSOR_ABI_VERSION ((uint32_t)0x00010000u)
 
-// ---------------------------------------------------------------------------
-// Host callbacks (Rapida → Censor, passed at init)
-// ---------------------------------------------------------------------------
+/* ---------------------------------------------------------------------------
+ * Host callback table
+ * -------------------------------------------------------------------------*/
 
-// RapidaHostCallbacks — Rapida fills this struct and passes it to
-// censor_init(). Censor routes all logging and fatal-error reporting
-// through these function pointers. The struct must remain valid from
-// censor_init() until censor_shutdown() returns.
+/* Rapida fills this struct and passes a pointer to censor_init().
+ * The pointer and all function pointers inside must remain valid until
+ * censor_shutdown() returns.
+ *
+ * struct_version must equal 1 for ABI v1.x. */
 typedef struct RapidaHostCallbacks {
-    // ABI version of this struct itself. Must equal 1 for Censor ABI v1.x.
     uint32_t struct_version;
 
-    // Log sink. Censor routes all log output through this function.
-    //   level:    0=TRACE 1=DEBUG 2=INFO 3=WARN 4=ERROR 5=CRITICAL
-    //   category: UTF-8 C string, may be NULL (treat as "censor").
-    //   message:  UTF-8 C string, NUL-terminated, never NULL.
-    // May be called from any thread; Rapida's logger is thread-safe.
-    void (*log)(void* user_data, int level, const char* category,
-                const char* message);
+    /* Log sink.  Censor routes all internal log output through this function.
+     * Level: 0=TRACE  1=DEBUG  2=INFO  3=WARN  4=ERROR  5=CRITICAL
+     * category: UTF-8 C string, may be NULL (treat as "censor")
+     * message:  UTF-8 C string, NUL-terminated, never NULL */
+    void (*log)(void* user_data, int level,
+                const char* category, const char* message);
 
-    // Crash capture. Called by Censor when a worker thread encounters a
-    // fatal error it cannot recover from. Rapida responds by:
-    //   1. Writing a CRITICAL log entry with the reason string.
-    //   2. Setting an atomic censor_poisoned flag — subsequent API calls
-    //      become no-ops.
-    //   3. Displaying a non-blocking banner ("Semantic features unavailable
-    //      for this session").
-    // Not called for normal (recoverable) errors; those return non-zero
-    // codes from the entry point functions.
+    /* Crash capture.  Called by Censor from a worker thread's top-level
+     * catch block when the thread cannot recover.
+     *
+     * Rapida's handler must:
+     *   1. Write a CRITICAL log entry with reason.
+     *   2. Set an atomic censor_poisoned flag — all further Censor calls
+     *      become no-ops on the Rapida side.
+     *   3. Post a non-blocking UI banner:
+     *      "Semantic features are unavailable for this session.
+     *       Restart Rapida to retry."
+     *   4. NOT attempt to restart Censor or reload the DLL.
+     *   5. NOT crash Rapida — the rest of the session continues.
+     *
+     * reason: UTF-8 C string describing why the fatal occurred, non-NULL.
+     *
+     * Thread safety: Rapida's implementation must be callable from any thread.
+     * Idempotency: Censor calls this at most once per process lifetime. */
     void (*on_censor_fatal)(void* user_data, const char* reason);
 
-    // Opaque user data forwarded unchanged to log() and on_censor_fatal().
+    /* Opaque pointer passed unchanged to log() and on_censor_fatal().
+     * Rapida uses it to carry its logger instance through the C boundary. */
     void* user_data;
 } RapidaHostCallbacks;
 
-// ---------------------------------------------------------------------------
-// Engine handle
-// ---------------------------------------------------------------------------
+/* ---------------------------------------------------------------------------
+ * Engine handle
+ * -------------------------------------------------------------------------*/
 
-// Opaque handle to a Rapida vector engine session. Internally a
-// rapida::engine::IVectorEngine* cast to void*. Censor must treat it as
-// opaque and read vector data only through rapida_vector_engine_c.h.
+/* Opaque handle Rapida passes to censor_attach_engine().
+ * Censor must treat this as completely opaque — all interaction goes through
+ * the rapida_vector_engine_c.h shim functions.  Never cast to a C++ type. */
 typedef void* RapidaVectorEngineHandle;
 
-// ---------------------------------------------------------------------------
-// Exported entry points
-// ---------------------------------------------------------------------------
+/* ---------------------------------------------------------------------------
+ * Symbol visibility
+ * -------------------------------------------------------------------------*/
 
-// Returns the packed ABI version: (major << 16) | (minor << 8) | patch.
-// Current: 1.0.0 → 0x00010000.
-// Rapida calls this immediately after loading the DLL. If the major
-// component does not match the host's expected major, the DLL is unloaded
-// and Rapida runs without Censor.
-CENSOR_API uint32_t censor_abi_version(void);
-
-// Called once per Rapida process, after the DLL loads and the version check
-// passes. host must remain valid until censor_shutdown() returns.
-// Returns CENSOR_OK (0) on success; non-zero causes Rapida to unload the DLL
-// and run without Censor for this process lifetime.
-CENSOR_API int32_t censor_init(const RapidaHostCallbacks* host);
-
-// Called once per Rapida process, during shutdown, after the last document
-// closes. Must be idempotent — safe to call even if censor_init() failed.
-CENSOR_API void censor_shutdown(void);
-
-// Called when a document session begins. engine is valid until
-// censor_detach_engine() returns. Censor must not retain the handle across
-// detach calls. Returns CENSOR_OK on success; non-zero on failure.
-CENSOR_API int32_t censor_attach_engine(RapidaVectorEngineHandle engine);
-
-// Called when a document session ends. Censor must release any outstanding
-// work referencing the engine before returning.
-CENSOR_API void censor_detach_engine(void);
-
-#ifdef __cplusplus
-}  // extern "C"
+#if defined(_WIN32)
+#  define CENSOR_EXPORT __declspec(dllexport)
+#elif defined(__GNUC__) || defined(__clang__)
+#  define CENSOR_EXPORT __attribute__((visibility("default")))
+#else
+#  define CENSOR_EXPORT
 #endif
 
-#endif  // CENSOR_ABI_H
+/* ---------------------------------------------------------------------------
+ * Exported entry points
+ *
+ * NOTE: The spec describes "six total exported symbols" (SPEC-censor-integration.md
+ * §"C ABI surface").  The current spec text explicitly defines five.  This header
+ * implements the five that are spec-defined.  A sixth will be added and the ABI
+ * version bumped when the spec is updated.
+ * -------------------------------------------------------------------------*/
+
+/* Returns CENSOR_ABI_VERSION.
+ * Called immediately after LoadLibrary/dlopen, before any other entry point. */
+CENSOR_EXPORT uint32_t censor_abi_version(void);
+
+/* Called once per process after the ABI version check passes.
+ * host must point to a valid RapidaHostCallbacks with struct_version == 1.
+ * Returns 0 on success, non-zero on error.  On non-zero return, Rapida
+ * unloads the DLL and continues without Censor. */
+CENSOR_EXPORT int32_t censor_init(const RapidaHostCallbacks* host);
+
+/* Called once per process during Rapida shutdown, after the last document
+ * session is closed.  Must be idempotent. */
+CENSOR_EXPORT void censor_shutdown(void);
+
+/* Called when a document session begins.  engine is valid until
+ * censor_detach_engine() returns; Censor must not retain it across that call.
+ * Returns 0 on success.
+ *
+ * Phase 3 stub behaviour: this implementation calls on_censor_fatal to
+ * exercise the end-to-end poison banner path before real classifier work
+ * lands.  See SPEC-censor-integration.md §"Phase 3 deliverables" DoD item:
+ * "stub Censor DLL calls on_censor_fatal during censor_attach_engine —
+ *  poison banner appears, rest of session works". */
+CENSOR_EXPORT int32_t censor_attach_engine(RapidaVectorEngineHandle engine);
+
+/* Called when a document session ends.  Censor must complete any outstanding
+ * work referencing engine before returning. */
+CENSOR_EXPORT void censor_detach_engine(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* CENSOR_ABI_H */
