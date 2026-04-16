@@ -3,3 +3,7 @@
 .dolt/
 *.db
 .beads-credential-key
+
+# CMake build output
+build/
+cmake-build-*/
