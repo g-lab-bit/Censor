@@ -60,17 +60,44 @@ Rapida (host)                            Censor (plugin DLL)
 
 ---
 
-## Build Sequence (gates — don't skip ahead)
+## Current State (2026-04-16)
 
-1. **Plugin scaffold** — CMake, DLL target, public API header, SQLite
-2. **Rapida C ABI integration** — consume `rapida_vector_engine_c.h`, wire host
-   callbacks (log/progress/cancel/producer), enumerate primitives
-3. **Clustering + features** — spatial grouping, 12-dim feature vector, grid
-4. **Debug overlay** — feature vectors on click, stroke weight bands
-5. **Seeding run** — calibrate constants on real PDFs
-6. **Classifier** — k-NN, confidence overlay, per-class activation
-7. **Active learning** — confusable negatives, N/N+label reclassification
-8. **Completeness** — % understood HUD, discovery queue
+**Built and on main:**
+- `include/censor_abi.h` — 5 exported C ABI functions + RapidaHostCallbacks
+- `src/censor_plugin.cpp` — stub DLL with poison banner, atomic state mgmt
+- `tests/test_poison_banner.cpp` — 7 GTest cases
+- `tests/test_smoke_dlopen.cpp` — 2 GTest cases (dlopen lifecycle + missing DLL fallback)
+- `CMakeLists.txt` — C++17, shared lib target, GTest v1.14 via FetchContent
+
+**Not built yet:** clustering, feature extraction, k-NN, SQLite, grid,
+active learning, debug viz, completeness — all tracked as beads.
+
+## Build
+
+```bash
+cmake -S . -B build && cmake --build build
+ctest --test-dir build
+```
+
+## Adding a Module
+
+Source files go in `src/<module>/` (clustering, storage, classifier, grid,
+overlay). All source files are part of the `censor` shared library target.
+Test executables: one per module (`test_<module>`), linking censor + GTest.
+Shared types: `#include "censor_types.h"` (src/censor_types.h).
+Test fixtures: `#include "test_utils.h"` (tests/test_utils.h).
+
+## Spec Trust Hierarchy
+
+When specs conflict, trust in this order:
+1. **SPEC-censor-integration.md** (Rapida rig) — authoritative C ABI contract
+2. **SPEC-censor-core.md** — algorithms (clustering, features, k-NN, SQLite)
+3. **SPEC-censor-ui.md** — UI data APIs (Rapida renders, Censor provides data)
+4. **SPEC-censor-plugin.md** — §2-§5 are STALE (pre-pivot Tessera API).
+   §1, §6-§8 still valid.
+
+**"Tessera" in specs = IVectorEngine post-pivot.** Censor consumes
+`rapida_vector_engine_c.h`, never links Tessera/MuPDF/PDFium.
 
 ---
 

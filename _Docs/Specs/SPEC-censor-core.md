@@ -7,8 +7,16 @@
 
 ## Purpose
 
+> **POST-PIVOT NOTE (2026-04-13):** This spec was written pre-pivot.
+> References to "Tessera display list" and "Tessera query API" throughout
+> mean **IVectorEngine element data** post-pivot. Censor consumes
+> Rapida's `IVectorEngine` stream via `rapida_vector_engine_c.h` C ABI
+> shim — it never links Tessera, MuPDF, or PDFium directly.
+> See SPEC-pivot-2026-04-13.md §3 and SPEC-censor-integration.md.
+> The algorithms described here are unchanged; only the data source changed.
+
 The classification engine inside Censor. Takes raw vector elements from
-Tessera's display list, groups them into spatial clusters, extracts feature
+the host's vector engine, groups them into spatial clusters, extracts feature
 vectors, and classifies them via k-NN with cosine similarity.
 
 This spec covers the build sequence from the original Vector Classifier spec

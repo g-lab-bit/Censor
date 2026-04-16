@@ -3,6 +3,21 @@
 # Phase: v0.1
 # Status: Draft
 
+> **§2-§5 PARTIALLY SUPERSEDED (2026-04-13 pivot).** The C ABI lifecycle
+> functions in §2 (`CensorConfig`, `censor_version()`,
+> `censor_required_tessera_version()`) and the Tessera-based attachment
+> model in §3 (`censor_attach(void* tessera_doc)`) are obsolete.
+>
+> **Authoritative ABI contract:**
+> `~/gt/Rapida/mayor/rig/_Docs/Specs/SPEC-censor-integration.md`
+> — defines the 5 exported C ABI functions, `RapidaHostCallbacks`,
+> `RapidaVectorEngineHandle`, and the load/fallback discipline.
+>
+> **What survives from this spec:** §1 (identity), §5 (overlay data
+> format concept), §6 (file organization), §7 (build system), §8
+> (storage location). The overlay struct shape will evolve as the
+> session/labeling APIs are designed.
+
 ---
 
 ## Purpose
