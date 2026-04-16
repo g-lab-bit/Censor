@@ -84,7 +84,7 @@ typedef struct RapidaHostCallbacks {
 typedef void* RapidaVectorEngineHandle;
 
 // ---------------------------------------------------------------------------
-// Six exported entry points
+// Exported entry points
 // ---------------------------------------------------------------------------
 
 // Returns the packed ABI version: (major << 16) | (minor << 8) | patch.

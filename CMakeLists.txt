@@ -26,7 +26,7 @@ target_compile_definitions(censor PRIVATE
     CENSOR_BUILDING_DLL
 )
 
-# Hide non-exported symbols on non-Windows platforms so only the six
+# Hide non-exported symbols on non-Windows platforms so only the
 # CENSOR_API symbols appear in the dynamic symbol table.
 if(NOT WIN32)
     target_compile_options(censor PRIVATE -fvisibility=hidden)
