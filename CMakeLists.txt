@@ -72,4 +72,31 @@ if(CENSOR_BUILD_TESTS)
 
     include(GoogleTest)
     gtest_discover_tests(test_poison_banner)
+
+    # ---------------------------------------------------------------------------
+    # Smoke test: loads censor.so via dlopen and exercises all ABI exports.
+    # No link-time dependency on censor — the DLL path is injected at build time.
+    # ---------------------------------------------------------------------------
+    add_executable(test_smoke_dlopen
+        tests/test_smoke_dlopen.cpp
+    )
+
+    target_include_directories(test_smoke_dlopen PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+
+    # Inject the full path to the censor shared library so the test can dlopen it.
+    target_compile_definitions(test_smoke_dlopen PRIVATE
+        CENSOR_DLL_PATH="$<TARGET_FILE:censor>"
+    )
+
+    target_link_libraries(test_smoke_dlopen PRIVATE
+        GTest::gtest_main
+        ${CMAKE_DL_LIBS}   # -ldl on Linux; empty on macOS/Windows
+    )
+
+    # censor must be built before the smoke test runs (dlopen needs the file).
+    add_dependencies(test_smoke_dlopen censor)
+
+    gtest_discover_tests(test_smoke_dlopen)
 endif()
