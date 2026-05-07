@@ -1,17 +1,23 @@
 #include <gtest/gtest.h>
+<<<<<<< HEAD
+#include "clustering/spatial_clustering.h"
+#include "test_utils.h"
 
 #include <algorithm>
+=======
+
 #include <cmath>
 #include <limits>
 
 #include "censor_types.h"
 #include "clustering/feature_vector.h"
-#include "clustering/spatial_clustering.h"
 #include "test_utils.h"
+>>>>>>> 99573ee (feat: feature vector extraction — 12 dimensions per cluster (ce-082))
 
 using namespace censor;
 using namespace censor::test;
 
+<<<<<<< HEAD
 // --- Proximity grouping ---
 
 TEST(ClusterPage, EmptyInputReturnsEmpty) {
@@ -165,8 +171,7 @@ TEST(ClusterCache, InvalidateAllClearsAll) {
 
     auto& result = cache.get_or_compute(0, wall);
     EXPECT_FALSE(result.empty());
-}
-
+=======
 /* ---------------------------------------------------------------------------
  * Helpers
  * -------------------------------------------------------------------------*/
@@ -423,4 +428,5 @@ TEST(FeatureVector, EmptyClusterReturnsZeroVector)
 
     for (int d = 0; d < FEATURE_DIM_COUNT; ++d)
         EXPECT_FLOAT_EQ(fv.dims[d], 0.0f) << "dim " << d;
+>>>>>>> 99573ee (feat: feature vector extraction — 12 dimensions per cluster (ce-082))
 }
