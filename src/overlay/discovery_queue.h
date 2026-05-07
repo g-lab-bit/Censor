@@ -1,0 +1,47 @@
+/*
+ * discovery_queue.h — Discovery queue (SPEC-censor-core.md §10 Phase 6 / SPEC-censor-ui.md §10).
+ *
+ * Returns the top-N unknown clusters sorted by maximum distance from all labeled
+ * examples in feature space. "Furthest from known" clusters are the most novel
+ * and therefore the most interesting to label next.
+ */
+
+#ifndef CENSOR_DISCOVERY_QUEUE_H
+#define CENSOR_DISCOVERY_QUEUE_H
+
+#include "censor_types.h"
+#include "classifier/iclassifier.h"
+
+#include <string>
+#include <vector>
+
+namespace censor {
+
+/* Click-to-navigate entry returned by compute_discovery_queue(). */
+struct DiscoveryEntry {
+    int   cluster_id;
+    int   page;
+    float bounds[4];     /* x0, y0, x1, y1 — for viewport navigation */
+    float max_distance;  /* 1 − max_cosine_similarity_to_any_labeled_example */
+};
+
+/* Returns top_n unknown clusters sorted by max_distance descending.
+ *
+ * A cluster is unknown when user_labels[i] is empty AND the classifier
+ * prediction is not above_threshold.
+ *
+ * labeled_features: feature vectors of all user-labeled clusters (positive
+ * examples). The caller constructs this from clusters where user_labels[i]
+ * is non-empty. Returns empty when labeled_features is empty. */
+__attribute__((visibility("default")))
+std::vector<DiscoveryEntry> compute_discovery_queue(
+    const std::vector<Cluster>&       clusters,
+    const std::vector<std::string>&   user_labels,
+    const std::vector<FeatureVector>& labeled_features,
+    const IClassifier&                classifier,
+    int                               page,
+    int                               top_n = 10);
+
+} /* namespace censor */
+
+#endif /* CENSOR_DISCOVERY_QUEUE_H */
