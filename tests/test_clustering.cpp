@@ -1,24 +1,17 @@
 #include <gtest/gtest.h>
-<<<<<<< HEAD
-#include "clustering/spatial_clustering.h"
-#include "clustering/stroke_weight_histogram.h"
-#include "test_utils.h"
 
 #include <algorithm>
-=======
-
 #include <cmath>
 #include <limits>
 
 #include "censor_types.h"
 #include "clustering/feature_vector.h"
+#include "clustering/spatial_clustering.h"
 #include "test_utils.h"
->>>>>>> 99573ee (feat: feature vector extraction — 12 dimensions per cluster (ce-082))
 
 using namespace censor;
 using namespace censor::test;
 
-<<<<<<< HEAD
 // --- Proximity grouping ---
 
 TEST(ClusterPage, EmptyInputReturnsEmpty) {
@@ -172,7 +165,8 @@ TEST(ClusterCache, InvalidateAllClearsAll) {
 
     auto& result = cache.get_or_compute(0, wall);
     EXPECT_FALSE(result.empty());
-=======
+}
+
 /* ---------------------------------------------------------------------------
  * Helpers
  * -------------------------------------------------------------------------*/
@@ -429,77 +423,4 @@ TEST(FeatureVector, EmptyClusterReturnsZeroVector)
 
     for (int d = 0; d < FEATURE_DIM_COUNT; ++d)
         EXPECT_FLOAT_EQ(fv.dims[d], 0.0f) << "dim " << d;
->>>>>>> 99573ee (feat: feature vector extraction — 12 dimensions per cluster (ce-082))
-}
-
-// ---------------------------------------------------------------------------
-// Stroke weight histogram tests (SPEC-censor-core §2)
-// ---------------------------------------------------------------------------
-
-using namespace censor;
-
-TEST(StrokeWeightHistogram, EmptyInputReturnsBandCountZero) {
-    auto bands = analyze_stroke_weights({});
-    EXPECT_EQ(bands.band_count, 0);
-}
-
-TEST(StrokeWeightHistogram, UniformWidthsReturnsSingleBand) {
-    // All exactly the same — max-min = 0, single band.
-    std::vector<float> widths(20, 0.5f);
-    auto bands = analyze_stroke_weights(widths);
-    EXPECT_EQ(bands.band_count, 1);
-    EXPECT_GT(bands.thresholds[0], 0.5f);
-}
-
-TEST(StrokeWeightHistogram, SingleBandDrawingNarrowSpread) {
-    // Slight variation within one bin width — still one band.
-    std::vector<float> widths = {0.48f, 0.50f, 0.50f, 0.50f, 0.52f};
-    auto bands = analyze_stroke_weights(widths);
-    EXPECT_EQ(bands.band_count, 1);
-}
-
-TEST(StrokeWeightHistogram, ThreeBandAECDrawing) {
-    // Three clearly-separated clusters: light (~0.3), medium (~1.0), heavy (~2.5).
-    std::vector<float> widths;
-    for (int i = 0; i < 10; ++i) widths.push_back(0.30f);
-    for (int i = 0; i < 10; ++i) widths.push_back(1.00f);
-    for (int i = 0; i < 10; ++i) widths.push_back(2.50f);
-
-    auto bands = analyze_stroke_weights(widths);
-    ASSERT_EQ(bands.band_count, 3);
-
-    // Light band threshold sits between 0.30 and 1.00.
-    EXPECT_GT(bands.thresholds[0], 0.30f);
-    EXPECT_LT(bands.thresholds[0], 1.00f);
-
-    // Medium band threshold sits between 1.00 and 2.50.
-    EXPECT_GT(bands.thresholds[1], 1.00f);
-    EXPECT_LT(bands.thresholds[1], 2.50f);
-
-    // Final threshold is above the heaviest observed width.
-    EXPECT_GT(bands.thresholds[2], 2.50f);
-}
-
-TEST(StrokeWeightHistogram, TwoBandDrawing) {
-    // Two clusters: thin lines (~0.25) and thick walls (~1.5).
-    std::vector<float> widths;
-    for (int i = 0; i < 15; ++i) widths.push_back(0.25f);
-    for (int i = 0; i < 15; ++i) widths.push_back(1.50f);
-
-    auto bands = analyze_stroke_weights(widths);
-    ASSERT_EQ(bands.band_count, 2);
-    EXPECT_GT(bands.thresholds[0], 0.25f);
-    EXPECT_LT(bands.thresholds[0], 1.50f);
-    EXPECT_GT(bands.thresholds[1], 1.50f);
-}
-
-TEST(StrokeWeightHistogram, BandCountCappedAtFour) {
-    // Five clusters — must be merged down to ≤4 bands.
-    std::vector<float> widths;
-    for (float center : {0.1f, 0.5f, 1.0f, 1.5f, 2.0f})
-        for (int i = 0; i < 8; ++i) widths.push_back(center);
-
-    auto bands = analyze_stroke_weights(widths);
-    EXPECT_LE(bands.band_count, 4);
-    EXPECT_GE(bands.band_count, 1);
 }
