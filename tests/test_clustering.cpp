@@ -1,13 +1,24 @@
 #include <gtest/gtest.h>
+<<<<<<< HEAD
 #include "clustering/spatial_clustering.h"
 #include "clustering/stroke_weight_histogram.h"
 #include "test_utils.h"
 
 #include <algorithm>
+=======
+
+#include <cmath>
+#include <limits>
+
+#include "censor_types.h"
+#include "clustering/feature_vector.h"
+#include "test_utils.h"
+>>>>>>> 99573ee (feat: feature vector extraction — 12 dimensions per cluster (ce-082))
 
 using namespace censor;
 using namespace censor::test;
 
+<<<<<<< HEAD
 // --- Proximity grouping ---
 
 TEST(ClusterPage, EmptyInputReturnsEmpty) {
@@ -161,6 +172,264 @@ TEST(ClusterCache, InvalidateAllClearsAll) {
 
     auto& result = cache.get_or_compute(0, wall);
     EXPECT_FALSE(result.empty());
+=======
+/* ---------------------------------------------------------------------------
+ * Helpers
+ * -------------------------------------------------------------------------*/
+
+/* Build a Cluster that references all elements in `elems` (indices 0..N-1)
+ * with bounds computed from the union of all element bounds. */
+static Cluster make_cluster_from(const std::vector<ElementData>& elems)
+{
+    Cluster c;
+    c.cluster_id = 0;
+
+    float x0 =  std::numeric_limits<float>::max();
+    float y0 =  std::numeric_limits<float>::max();
+    float x1 = -std::numeric_limits<float>::max();
+    float y1 = -std::numeric_limits<float>::max();
+
+    for (std::size_t i = 0; i < elems.size(); ++i) {
+        c.element_indices.push_back(static_cast<int>(i));
+        x0 = std::min(x0, elems[i].bounds[0]);
+        y0 = std::min(y0, elems[i].bounds[1]);
+        x1 = std::max(x1, elems[i].bounds[2]);
+        y1 = std::max(y1, elems[i].bounds[3]);
+    }
+
+    c.bounds[0] = x0; c.bounds[1] = y0;
+    c.bounds[2] = x1; c.bounds[3] = y1;
+    return c;
+}
+
+static StrokeWeightBands no_bands() { return {}; }
+
+/* ---------------------------------------------------------------------------
+ * Dim 10 — ELEMENT_COUNT
+ * -------------------------------------------------------------------------*/
+
+TEST(FeatureVector, ElementCountMatchesClusterSize)
+{
+    auto elems   = make_wall_cluster();   /* 2 strokes */
+    auto cluster = make_cluster_from(elems);
+    auto fv      = compute_features(cluster, elems, no_bands());
+    EXPECT_FLOAT_EQ(fv.dims[ELEMENT_COUNT], 2.0f);
+}
+
+TEST(FeatureVector, ElementCountFiveElements)
+{
+    std::vector<ElementData> elems;
+    for (int i = 0; i < 5; ++i)
+        elems.push_back(make_element(static_cast<uint32_t>(i),
+                                     static_cast<float>(i * 10), 0.0f,
+                                     8.0f, 1.0f, 0.5f));
+    auto cluster = make_cluster_from(elems);
+    auto fv      = compute_features(cluster, elems, no_bands());
+    EXPECT_FLOAT_EQ(fv.dims[ELEMENT_COUNT], 5.0f);
+}
+
+/* ---------------------------------------------------------------------------
+ * Dim 7 — FILL_PRESENCE
+ * -------------------------------------------------------------------------*/
+
+TEST(FeatureVector, FillPresenceOneWhenFilledElementPresent)
+{
+    std::vector<ElementData> elems = {
+        make_element(0, 0.0f, 0.0f, 50.0f, 50.0f,
+                     1.0f, 0xFF000000u, 0x0000FFFFu)  /* filled rect */
+    };
+    auto cluster = make_cluster_from(elems);
+    auto fv      = compute_features(cluster, elems, no_bands());
+    EXPECT_FLOAT_EQ(fv.dims[FILL_PRESENCE], 1.0f);
+}
+
+TEST(FeatureVector, FillPresenceZeroWhenNoFill)
+{
+    auto elems   = make_wall_cluster();  /* stroked only, fill_rgba = 0 */
+    auto cluster = make_cluster_from(elems);
+    auto fv      = compute_features(cluster, elems, no_bands());
+    EXPECT_FLOAT_EQ(fv.dims[FILL_PRESENCE], 0.0f);
+}
+
+/* ---------------------------------------------------------------------------
+ * Dim 8 — ASPECT_RATIO
+ * -------------------------------------------------------------------------*/
+
+TEST(FeatureVector, AspectRatioWidthOverHeight)
+{
+    /* Single element 100 wide × 20 tall → ratio = 5.0 */
+    std::vector<ElementData> elems = {
+        make_element(0, 0.0f, 0.0f, 100.0f, 20.0f, 1.0f)
+    };
+    auto cluster = make_cluster_from(elems);
+    auto fv      = compute_features(cluster, elems, no_bands());
+    EXPECT_NEAR(fv.dims[ASPECT_RATIO], 5.0f, 0.001f);
+}
+
+TEST(FeatureVector, AspectRatioSquareIsOne)
+{
+    std::vector<ElementData> elems = {
+        make_element(0, 0.0f, 0.0f, 60.0f, 60.0f, 1.0f)
+    };
+    auto cluster = make_cluster_from(elems);
+    auto fv      = compute_features(cluster, elems, no_bands());
+    EXPECT_NEAR(fv.dims[ASPECT_RATIO], 1.0f, 0.001f);
+}
+
+/* ---------------------------------------------------------------------------
+ * Dim 9 — BBOX_AREA
+ * -------------------------------------------------------------------------*/
+
+TEST(FeatureVector, BBoxAreaIsWidthTimesHeight)
+{
+    /* Element 80 wide × 40 tall → area = 3200 */
+    std::vector<ElementData> elems = {
+        make_element(0, 10.0f, 10.0f, 80.0f, 40.0f, 1.0f)
+    };
+    auto cluster = make_cluster_from(elems);
+    auto fv      = compute_features(cluster, elems, no_bands());
+    EXPECT_NEAR(fv.dims[BBOX_AREA], 80.0f * 40.0f, 0.01f);
+}
+
+TEST(FeatureVector, BBoxAreaSpansAllElements)
+{
+    /* Two elements forming a 200×20 bounding box */
+    std::vector<ElementData> elems = {
+        make_element(0,   0.0f, 0.0f, 100.0f, 20.0f, 0.5f),
+        make_element(1, 100.0f, 0.0f, 100.0f, 20.0f, 0.5f),
+    };
+    auto cluster = make_cluster_from(elems);
+    auto fv      = compute_features(cluster, elems, no_bands());
+    EXPECT_NEAR(fv.dims[BBOX_AREA], 200.0f * 20.0f, 0.01f);
+}
+
+/* ---------------------------------------------------------------------------
+ * Dim 2 — STROKE_WEIGHT_MEAN
+ * -------------------------------------------------------------------------*/
+
+TEST(FeatureVector, StrokeWeightMeanAveragesWidths)
+{
+    /* Two strokes: widths 0.5 and 1.5 → mean = 1.0 */
+    std::vector<ElementData> elems = {
+        make_element(0, 0.0f, 0.0f, 100.0f, 1.0f, 0.5f),
+        make_element(1, 0.0f, 5.0f, 100.0f, 1.0f, 1.5f),
+    };
+    auto cluster = make_cluster_from(elems);
+    auto fv      = compute_features(cluster, elems, no_bands());
+    EXPECT_NEAR(fv.dims[STROKE_WEIGHT_MEAN], 1.0f, 0.001f);
+}
+
+/* ---------------------------------------------------------------------------
+ * Dim 0 — STROKE_LENGTH
+ * -------------------------------------------------------------------------*/
+
+TEST(FeatureVector, StrokeLengthNormalized)
+{
+    /* Single horizontal element 500 pts wide → raw = 500, normalized = 0.5 */
+    std::vector<ElementData> elems = {
+        make_element(0, 0.0f, 0.0f, 500.0f, 1.0f, 0.5f)
+    };
+    auto cluster = make_cluster_from(elems);
+    auto fv      = compute_features(cluster, elems, no_bands());
+    EXPECT_NEAR(fv.dims[STROKE_LENGTH], 500.0f / FV_NORM_STROKE_LENGTH, 0.001f);
+}
+
+/* ---------------------------------------------------------------------------
+ * Dim 4+5 — CLOSED_LOOP_COUNT / CLOSED_LOOP_AREA
+ * -------------------------------------------------------------------------*/
+
+TEST(FeatureVector, ClosedLoopCountAndAreaForFilledElement)
+{
+    std::vector<ElementData> elems = {
+        make_element(0, 0.0f, 0.0f, 60.0f, 40.0f,
+                     1.0f, 0xFF000000u, 0x0000FFFFu)  /* 60×40 filled rect */
+    };
+    auto cluster = make_cluster_from(elems);
+    auto fv      = compute_features(cluster, elems, no_bands());
+    EXPECT_FLOAT_EQ(fv.dims[CLOSED_LOOP_COUNT], 1.0f);
+    /* area = 60×40 = 2400, normalized by FV_NORM_LOOP_AREA */
+    EXPECT_NEAR(fv.dims[CLOSED_LOOP_AREA], 2400.0f / FV_NORM_LOOP_AREA, 0.0001f);
+}
+
+TEST(FeatureVector, ClosedLoopCountZeroForStrokedOnly)
+{
+    auto elems   = make_wall_cluster();
+    auto cluster = make_cluster_from(elems);
+    auto fv      = compute_features(cluster, elems, no_bands());
+    EXPECT_FLOAT_EQ(fv.dims[CLOSED_LOOP_COUNT], 0.0f);
+    EXPECT_FLOAT_EQ(fv.dims[CLOSED_LOOP_AREA],  0.0f);
+}
+
+/* ---------------------------------------------------------------------------
+ * Dim 11 — PARALLEL_OFFSET
+ * -------------------------------------------------------------------------*/
+
+TEST(FeatureVector, ParallelOffsetNonZeroForWallCluster)
+{
+    /* make_wall_cluster: two parallel horizontal strokes 8 pts apart */
+    auto elems   = make_wall_cluster();
+    auto cluster = make_cluster_from(elems);
+    auto fv      = compute_features(cluster, elems, no_bands());
+    /* Normalized offset ≈ 8/100 = 0.08; just verify it's positive */
+    EXPECT_GT(fv.dims[PARALLEL_OFFSET], 0.0f);
+}
+
+TEST(FeatureVector, ParallelOffsetZeroForSingleStroke)
+{
+    /* Only one stroke — no pair to form an offset */
+    std::vector<ElementData> elems = {
+        make_element(0, 0.0f, 0.0f, 200.0f, 1.0f, 0.5f)
+    };
+    auto cluster = make_cluster_from(elems);
+    auto fv      = compute_features(cluster, elems, no_bands());
+    EXPECT_FLOAT_EQ(fv.dims[PARALLEL_OFFSET], 0.0f);
+}
+
+/* ---------------------------------------------------------------------------
+ * Dim 3 — STROKE_WEIGHT_BAND (with calibrated bands)
+ * -------------------------------------------------------------------------*/
+
+TEST(FeatureVector, StrokeWeightBandAssignedCorrectly)
+{
+    /* Two bands: [0..0.8] = band 0, [0.8..2.0] = band 1 */
+    StrokeWeightBands bands;
+    bands.band_count    = 2;
+    bands.thresholds[0] = 0.8f;
+    bands.thresholds[1] = 2.0f;
+
+    /* Stroke width 0.5 → band 0 */
+    std::vector<ElementData> elems = {
+        make_element(0, 0.0f, 0.0f, 100.0f, 1.0f, 0.5f)
+    };
+    auto cluster = make_cluster_from(elems);
+    auto fv      = compute_features(cluster, elems, bands);
+    EXPECT_NEAR(fv.dims[STROKE_WEIGHT_BAND], 0.0f, 0.001f);
+
+    /* Stroke width 1.5 → band 1 */
+    std::vector<ElementData> elems2 = {
+        make_element(0, 0.0f, 0.0f, 100.0f, 1.0f, 1.5f)
+    };
+    auto c2  = make_cluster_from(elems2);
+    auto fv2 = compute_features(c2, elems2, bands);
+    EXPECT_NEAR(fv2.dims[STROKE_WEIGHT_BAND], 1.0f, 0.001f);
+}
+
+/* ---------------------------------------------------------------------------
+ * Edge case — empty cluster returns zero vector
+ * -------------------------------------------------------------------------*/
+
+TEST(FeatureVector, EmptyClusterReturnsZeroVector)
+{
+    Cluster empty;
+    empty.cluster_id = 0;
+    empty.bounds[0] = empty.bounds[1] = empty.bounds[2] = empty.bounds[3] = 0.0f;
+
+    std::vector<ElementData> elems;
+    auto fv = compute_features(empty, elems, no_bands());
+
+    for (int d = 0; d < FEATURE_DIM_COUNT; ++d)
+        EXPECT_FLOAT_EQ(fv.dims[d], 0.0f) << "dim " << d;
+>>>>>>> 99573ee (feat: feature vector extraction — 12 dimensions per cluster (ce-082))
 }
 
 // ---------------------------------------------------------------------------
