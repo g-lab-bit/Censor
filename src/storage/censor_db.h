@@ -73,7 +73,7 @@ struct PatternEntry {
 /* ---------------------------------------------------------------------------
  * CensorDb — RAII wrapper around an SQLite connection.
  * -------------------------------------------------------------------------*/
-class CensorDb {
+class __attribute__((visibility("default"))) CensorDb {
 public:
     CensorDb() = default;
     ~CensorDb();

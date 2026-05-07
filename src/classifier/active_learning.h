@@ -35,7 +35,7 @@ struct Suggestion {
     float         confidence  = 0.0f; /* classifier confidence at query time */
 };
 
-class ActiveLearner {
+class __attribute__((visibility("default"))) ActiveLearner {
 public:
     ActiveLearner(CensorDb& db, IClassifier& classifier);
 
