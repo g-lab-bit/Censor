@@ -25,7 +25,7 @@ namespace censor {
  * Lifecycle: start() → submit(…) × N → stop().
  * stop() drains the pending queue before the thread exits.
  * -------------------------------------------------------------------------*/
-class BackgroundWorker {
+class __attribute__((visibility("default"))) BackgroundWorker {
 public:
     BackgroundWorker(std::shared_ptr<IClassifier> classifier,
                      ConfidenceOverlay& overlay);

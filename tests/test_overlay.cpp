@@ -1,9 +1,16 @@
 #include <gtest/gtest.h>
 
 #include "overlay/completeness.h"
+#include "overlay/confidence_overlay.h"
 #include "overlay/discovery_queue.h"
+#include "classifier/background_worker.h"
+#include "classifier/iclassifier.h"
 #include "classifier/knn_classifier.h"
 #include "censor_types.h"
+
+#include <chrono>
+#include <memory>
+#include <thread>
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                     */
@@ -243,4 +250,163 @@ TEST(DiscoveryQueue, UpdatesAfterNewLabel)
     auto q_after = compute_discovery_queue(clusters, labels, labeled_fvs, clf, 0);
     EXPECT_EQ(q_after.size(), 1u);
     EXPECT_EQ(q_after[0].cluster_id, 1);
+}
+
+/* ========================================================================== */
+/* ConfidenceOverlay tests                                                     */
+/* ========================================================================== */
+
+TEST(ConfidenceOverlay, BelowThresholdNotAdded)
+{
+    ConfidenceOverlay ov;
+    float bounds[4] = {0, 0, 10, 10};
+    ClassifyResult r{"wall", 0.9f, /*above_threshold=*/false};
+    ov.update(1, bounds, r);
+    EXPECT_TRUE(ov.snapshot().empty());
+}
+
+TEST(ConfidenceOverlay, BoundsConfidenceLabelCarryThrough)
+{
+    ConfidenceOverlay ov;
+    float bounds[4] = {1.0f, 2.0f, 3.0f, 4.0f};
+    ClassifyResult r{"duct", 0.75f, /*above_threshold=*/true};
+    ov.update(42, bounds, r);
+
+    auto snap = ov.snapshot();
+    ASSERT_EQ(snap.size(), 1u);
+    EXPECT_EQ(snap[0].cluster_id, 42);
+    EXPECT_EQ(snap[0].label, "duct");
+    EXPECT_FLOAT_EQ(snap[0].confidence, 0.75f);
+    EXPECT_FLOAT_EQ(snap[0].bounds[0], 1.0f);
+    EXPECT_FLOAT_EQ(snap[0].bounds[1], 2.0f);
+    EXPECT_FLOAT_EQ(snap[0].bounds[2], 3.0f);
+    EXPECT_FLOAT_EQ(snap[0].bounds[3], 4.0f);
+    /* alpha channel must equal confidence */
+    EXPECT_FLOAT_EQ(snap[0].color[3], 0.75f);
+}
+
+TEST(ConfidenceOverlay, UserLabelConfidenceOneIsUserLabeled)
+{
+    ConfidenceOverlay ov;
+    float bounds[4] = {0, 0, 5, 5};
+    ov.update_user_label(7, bounds, "pipe");
+
+    auto snap = ov.snapshot();
+    ASSERT_EQ(snap.size(), 1u);
+    EXPECT_EQ(snap[0].label, "pipe");
+    EXPECT_FLOAT_EQ(snap[0].confidence, 1.0f);
+    EXPECT_TRUE(snap[0].is_user_labeled);
+}
+
+TEST(ConfidenceOverlay, RemoveDeletesEntry)
+{
+    ConfidenceOverlay ov;
+    float bounds[4] = {0, 0, 1, 1};
+    ClassifyResult r{"wall", 0.8f, true};
+    ov.update(3, bounds, r);
+    ASSERT_EQ(ov.snapshot().size(), 1u);
+
+    ov.remove(3);
+    EXPECT_TRUE(ov.snapshot().empty());
+}
+
+TEST(ConfidenceOverlay, ClearRemovesAllEntries)
+{
+    ConfidenceOverlay ov;
+    float bounds[4] = {0, 0, 1, 1};
+    ClassifyResult r{"wall", 0.8f, true};
+    ov.update(1, bounds, r);
+    ov.update(2, bounds, r);
+    ASSERT_EQ(ov.snapshot().size(), 2u);
+
+    ov.clear();
+    EXPECT_TRUE(ov.snapshot().empty());
+}
+
+/* ========================================================================== */
+/* BackgroundWorker tests                                                      */
+/* ========================================================================== */
+
+namespace {
+
+/* Minimal IClassifier stub — always returns a fixed result above threshold. */
+class StubClassifier : public IClassifier {
+public:
+    explicit StubClassifier(const std::string& label, float confidence)
+        : label_(label), confidence_(confidence) {}
+
+    ClassifyResult predict(const FeatureVector&) const override
+    {
+        return {label_, confidence_, /*above_threshold=*/true};
+    }
+    void add_example(const FeatureVector&, const std::string&, bool) override {}
+    std::map<std::string, int> label_counts() const override { return {}; }
+
+private:
+    std::string label_;
+    float       confidence_;
+};
+
+} /* anonymous namespace */
+
+TEST(BackgroundWorker, ClassifiesAndUpdatesOverlay)
+{
+    ConfidenceOverlay ov;
+    auto clf = std::make_shared<StubClassifier>("wall", 0.9f);
+    BackgroundWorker worker(clf, ov);
+
+    Cluster c;
+    c.cluster_id = 1;
+    c.bounds[0] = 0; c.bounds[1] = 0; c.bounds[2] = 10; c.bounds[3] = 10;
+
+    worker.start();
+    worker.submit(c);
+    worker.stop();
+
+    auto snap = ov.snapshot();
+    ASSERT_EQ(snap.size(), 1u);
+    EXPECT_EQ(snap[0].cluster_id, 1);
+    EXPECT_EQ(snap[0].label, "wall");
+    EXPECT_FLOAT_EQ(snap[0].confidence, 0.9f);
+}
+
+TEST(BackgroundWorker, MultipleJobsAllProcessed)
+{
+    ConfidenceOverlay ov;
+    auto clf = std::make_shared<StubClassifier>("duct", 0.8f);
+    BackgroundWorker worker(clf, ov);
+
+    worker.start();
+    for (int i = 0; i < 5; ++i) {
+        Cluster c;
+        c.cluster_id = i;
+        c.bounds[0] = static_cast<float>(i); c.bounds[1] = 0;
+        c.bounds[2] = static_cast<float>(i) + 1; c.bounds[3] = 1;
+        worker.submit(c);
+    }
+    worker.stop();
+
+    EXPECT_EQ(ov.snapshot().size(), 5u);
+}
+
+TEST(BackgroundWorker, StopDrainsQueueBeforeExit)
+{
+    ConfidenceOverlay ov;
+    auto clf = std::make_shared<StubClassifier>("pipe", 0.7f);
+    BackgroundWorker worker(clf, ov);
+
+    worker.start();
+    /* Submit a burst then stop — stop() must drain before returning. */
+    for (int i = 0; i < 10; ++i) {
+        Cluster c;
+        c.cluster_id = i;
+        c.bounds[0] = 0; c.bounds[1] = 0; c.bounds[2] = 1; c.bounds[3] = 1;
+        worker.submit(c);
+    }
+    worker.stop();
+
+    /* All 10 clusters should have been processed (last write wins per id,
+     * but all 10 unique ids → 10 entries since each id is unique). */
+    EXPECT_EQ(ov.snapshot().size(), 10u);
+    EXPECT_FALSE(worker.is_running());
 }

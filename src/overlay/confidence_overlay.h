@@ -15,6 +15,7 @@ namespace censor {
 /* Deterministic RGB colour from a label string (hue derived from hash).
  * Returns {r, g, b} in [0, 1]. Combined with confidence as alpha to
  * produce the "class colour at confidence opacity" specified by the plugin. */
+__attribute__((visibility("default")))
 std::array<float, 3> label_to_rgb(const std::string& label);
 
 /* ---------------------------------------------------------------------------
@@ -24,7 +25,7 @@ std::array<float, 3> label_to_rgb(const std::string& label);
  * activation threshold (ClassifyResult::above_threshold == true).
  * Thread-safe: update/remove/clear are safe from any thread.
  * -------------------------------------------------------------------------*/
-class ConfidenceOverlay {
+class __attribute__((visibility("default"))) ConfidenceOverlay {
 public:
     /* Update or insert overlay entry for a classified cluster.
      * Ignored when result.above_threshold is false or result.label is empty. */
