@@ -1,9 +1,0 @@
-{
-  "backend": "dolt",
-  "database": "dolt",
-  "dolt_database": "Censor",
-  "dolt_mode": "server",
-  "dolt_server_host": "127.0.0.1",
-  "dolt_server_port": 3307,
-  "project_id": "2ecdef75-bbd9-4e59-ae0d-5bdcfcd4e62a"
-}
