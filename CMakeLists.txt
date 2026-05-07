@@ -134,6 +134,7 @@ if(CENSOR_BUILD_TESTS)
         target_include_directories(test_${module} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src
             ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests
         )
         target_link_libraries(test_${module} PRIVATE
             censor
