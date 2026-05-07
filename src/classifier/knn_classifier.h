@@ -19,7 +19,7 @@ static constexpr int   KNN_K                      = 5;
 static constexpr int   SEEDING_THRESHOLD_PER_CLASS = 10;
 static constexpr float CLASSIFIER_CONFIDENCE_THRESHOLD = 0.80f;
 
-class KNNClassifier final : public IClassifier {
+class __attribute__((visibility("default"))) KNNClassifier final : public IClassifier {
 public:
     KNNClassifier() = default;
 
