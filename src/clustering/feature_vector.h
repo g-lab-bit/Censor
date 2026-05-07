@@ -1,5 +1,6 @@
 #pragma once
 
+#include "clustering/cluster.h"  /* CENSOR_API macro */
 #include "censor_types.h"
 
 #include <vector>
@@ -34,7 +35,7 @@ static constexpr float FV_PARALLEL_MIN_LENGTH  = 10.0f;  /* minimum element leng
  * Returns a FeatureVector with all dims filled.  Dims 6 (ADJACENT_CONNECTIVITY)
  * is always 0 here — requires grid context from the caller.
  * -------------------------------------------------------------------------*/
-FeatureVector compute_features(
+CENSOR_API FeatureVector compute_features(
     const Cluster&                  cluster,
     const std::vector<ElementData>& elements,
     const StrokeWeightBands&        weight_bands);

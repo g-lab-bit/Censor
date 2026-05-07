@@ -14,7 +14,7 @@ static float major_axis_angle(const ElementData& e)
 {
     float w = e.bounds[2] - e.bounds[0];
     float h = e.bounds[3] - e.bounds[1];
-    return std::atan2f(h, w);
+    return std::atan2(h, w);
 }
 
 /* Length along the major axis (longer bounding-box dimension). */
