@@ -123,11 +123,30 @@ if(CENSOR_BUILD_TESTS)
     gtest_discover_tests(test_smoke_dlopen)
 
     # ---------------------------------------------------------------------------
-    # Per-module test executables (test_clustering pattern)
+    # test_clustering — internal module; compiles sources directly to access
+    # symbols hidden by the shared-library visibility preset.
+    # ---------------------------------------------------------------------------
+    add_executable(test_clustering
+        tests/test_clustering.cpp
+        src/clustering/feature_vector.cpp
+        src/clustering/spatial_clustering.cpp
+    )
+    target_include_directories(test_clustering PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests
+    )
+    target_link_libraries(test_clustering PRIVATE
+        GTest::gtest_main
+    )
+    gtest_discover_tests(test_clustering)
+
+    # ---------------------------------------------------------------------------
+    # Per-module test executables
     # Each links against the censor shared library + GTest.
     # To add a module test: follow this foreach pattern.
     # ---------------------------------------------------------------------------
-    foreach(module clustering storage classifier grid overlay)
+    foreach(module storage classifier grid overlay)
         add_executable(test_${module}
             tests/test_${module}.cpp
         )
