@@ -146,7 +146,24 @@ if(CENSOR_BUILD_TESTS)
     # Each links against the censor shared library + GTest.
     # To add a module test: follow this foreach pattern.
     # ---------------------------------------------------------------------------
-    foreach(module storage classifier grid overlay)
+    # ---------------------------------------------------------------------------
+    # test_grid — internal module; compiles sources directly.
+    # ---------------------------------------------------------------------------
+    add_executable(test_grid
+        tests/test_grid.cpp
+        src/grid/grid_system.cpp
+    )
+    target_include_directories(test_grid PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests
+    )
+    target_link_libraries(test_grid PRIVATE
+        GTest::gtest_main
+    )
+    gtest_discover_tests(test_grid)
+
+    foreach(module storage classifier overlay)
         add_executable(test_${module}
             tests/test_${module}.cpp
         )
