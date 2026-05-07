@@ -1,2 +1,3 @@
 #include <gtest/gtest.h>
-// overlay tests — add cases here as the module is implemented
+
+// Placeholder — tests for the overlay module will be added here.

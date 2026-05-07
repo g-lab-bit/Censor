@@ -1,2 +1,3 @@
 #include <gtest/gtest.h>
-// storage tests — add cases here as the module is implemented
+
+// Placeholder — tests for the storage module will be added here.
