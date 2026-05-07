@@ -30,6 +30,7 @@ add_library(censor SHARED
 target_include_directories(censor
     PUBLIC  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
             $<INSTALL_INTERFACE:include>
+    PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
 )
 
 set_target_properties(censor PROPERTIES
@@ -64,6 +65,7 @@ if(CENSOR_BUILD_TESTS)
 
     target_include_directories(test_poison_banner PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
 
     target_link_libraries(test_poison_banner PRIVATE

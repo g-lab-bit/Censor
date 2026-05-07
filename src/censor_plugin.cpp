@@ -21,6 +21,7 @@
  */
 
 #include "censor_abi.h"
+#include "censor_types.h"
 
 #include <atomic>
 #include <cstring>
