@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(Censor VERSION 1.0.0 LANGUAGES CXX)
+project(Censor VERSION 1.0.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -39,18 +39,26 @@ if(NOT MSVC)
 endif()
 
 # ---------------------------------------------------------------------------
+# SQLite amalgamation — compiled as C (not C++) to match upstream expectations.
+# ---------------------------------------------------------------------------
+add_library(sqlite3_obj OBJECT third_party/sqlite/sqlite3.c)
+target_include_directories(sqlite3_obj PUBLIC third_party/sqlite)
+set_target_properties(sqlite3_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+# ---------------------------------------------------------------------------
 # censor shared library (the DLL)
 # ---------------------------------------------------------------------------
 file(GLOB_RECURSE CENSOR_SOURCES CONFIGURE_DEPENDS
     src/*.cpp
 )
 
-add_library(censor SHARED ${CENSOR_SOURCES})
+add_library(censor SHARED ${CENSOR_SOURCES} $<TARGET_OBJECTS:sqlite3_obj>)
 
 target_include_directories(censor
     PUBLIC  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
             $<INSTALL_INTERFACE:include>
     PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/sqlite>
 )
 
 set_target_properties(censor PROPERTIES
