@@ -197,6 +197,7 @@ if(CENSOR_BUILD_TESTS)
         src/clustering/feature_vector.cpp
         src/clustering/spatial_clustering.cpp
         src/classifier/knn_classifier.cpp
+        src/classifier/background_worker.cpp
         src/overlay/completeness.cpp
         src/overlay/confidence_overlay.cpp
         src/overlay/debug_viz_data.cpp
