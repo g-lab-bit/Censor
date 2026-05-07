@@ -141,4 +141,21 @@ if(CENSOR_BUILD_TESTS)
         )
         gtest_discover_tests(test_${module})
     endforeach()
+
+    # ---------------------------------------------------------------------------
+    # test_test_utils — exercises the synthetic data generators in test_utils.h.
+    # Header-only; no censor shared library needed — only GTest.
+    # ---------------------------------------------------------------------------
+    add_executable(test_test_utils
+        tests/test_test_utils.cpp
+    )
+    target_include_directories(test_test_utils PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests
+    )
+    target_link_libraries(test_test_utils PRIVATE
+        GTest::gtest_main
+    )
+    gtest_discover_tests(test_test_utils)
+
 endif()
