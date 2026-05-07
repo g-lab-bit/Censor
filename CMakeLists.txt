@@ -171,7 +171,7 @@ if(CENSOR_BUILD_TESTS)
     )
     gtest_discover_tests(test_grid)
 
-    foreach(module storage classifier active_learning overlay)
+    foreach(module storage classifier active_learning)
         add_executable(test_${module}
             tests/test_${module}.cpp
         )
@@ -186,6 +186,31 @@ if(CENSOR_BUILD_TESTS)
         )
         gtest_discover_tests(test_${module})
     endforeach()
+
+    # ---------------------------------------------------------------------------
+    # test_overlay — internal module; compiles sources directly to access
+    # symbols hidden by the shared-library visibility preset.
+    # Covers: completeness, discovery_queue, debug_viz_data.
+    # ---------------------------------------------------------------------------
+    add_executable(test_overlay
+        tests/test_overlay.cpp
+        src/clustering/feature_vector.cpp
+        src/clustering/spatial_clustering.cpp
+        src/classifier/knn_classifier.cpp
+        src/overlay/completeness.cpp
+        src/overlay/confidence_overlay.cpp
+        src/overlay/debug_viz_data.cpp
+        src/overlay/discovery_queue.cpp
+    )
+    target_include_directories(test_overlay PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests
+    )
+    target_link_libraries(test_overlay PRIVATE
+        GTest::gtest_main
+    )
+    gtest_discover_tests(test_overlay)
 
     # ---------------------------------------------------------------------------
     # test_test_utils — exercises the synthetic data generators in test_utils.h.

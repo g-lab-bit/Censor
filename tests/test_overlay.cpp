@@ -2,13 +2,16 @@
 
 #include "overlay/completeness.h"
 #include "overlay/confidence_overlay.h"
+#include "overlay/debug_viz_data.h"
 #include "overlay/discovery_queue.h"
 #include "classifier/background_worker.h"
 #include "classifier/iclassifier.h"
 #include "classifier/knn_classifier.h"
 #include "censor_types.h"
 
+#include <cfloat>
 #include <chrono>
+#include <cstring>
 #include <memory>
 #include <thread>
 
@@ -409,4 +412,123 @@ TEST(BackgroundWorker, StopDrainsQueueBeforeExit)
      * but all 10 unique ids → 10 entries since each id is unique). */
     EXPECT_EQ(ov.snapshot().size(), 10u);
     EXPECT_FALSE(worker.is_running());
+}
+
+/* ========================================================================== */
+/* DebugVizData tests                                                          */
+/* ========================================================================== */
+
+TEST(DebugVizData, FeatureOverlay_NotFound)
+{
+    DebugVizData dvd;
+    FeatureOverlayData result = dvd.get_feature_overlay(99);
+    EXPECT_EQ(result.cluster_id, 99);
+    EXPECT_FALSE(result.found);
+}
+
+TEST(DebugVizData, FeatureOverlay_ReturnsAllTwelveDims)
+{
+    DebugVizData dvd;
+    FeatureVector fv{};
+    for (int i = 0; i < FEATURE_DIM_COUNT; ++i)
+        fv.dims[i] = static_cast<float>(i + 1);
+
+    Cluster c = make_cluster(5, fv);
+    dvd.register_cluster(c);
+
+    FeatureOverlayData result = dvd.get_feature_overlay(5);
+    ASSERT_TRUE(result.found);
+    EXPECT_EQ(result.cluster_id, 5);
+    for (int i = 0; i < FEATURE_DIM_COUNT; ++i) {
+        EXPECT_FLOAT_EQ(result.features[i].value, static_cast<float>(i + 1));
+        EXPECT_NE(result.features[i].name, nullptr);
+        EXPECT_GT(std::strlen(result.features[i].name), 0u);
+    }
+}
+
+TEST(DebugVizData, FeatureOverlay_ClearRemovesClusters)
+{
+    DebugVizData dvd;
+    dvd.register_cluster(make_cluster(1, fv_unit(0)));
+    dvd.clear();
+    EXPECT_FALSE(dvd.get_feature_overlay(1).found);
+}
+
+TEST(DebugVizData, Histogram_EmptyInput)
+{
+    std::vector<float> empty;
+    HistogramData result = DebugVizData::compute_histogram(empty);
+    EXPECT_TRUE(result.bins.empty());
+}
+
+TEST(DebugVizData, Histogram_SingleWidth_OneBin)
+{
+    std::vector<float> widths(10, 0.5f);
+    HistogramData result = DebugVizData::compute_histogram(widths, 0.1f);
+    ASSERT_FALSE(result.bins.empty());
+    int total = 0;
+    for (const auto& b : result.bins) total += b.count;
+    EXPECT_EQ(total, 10);
+    EXPECT_EQ(result.bands.band_count, 1);
+}
+
+TEST(DebugVizData, Histogram_TwoPeaks_TwoBands)
+{
+    /* Thin strokes ~0.25pt (20 samples) and thick strokes ~2.0pt (20 samples).
+     * Should produce 2 detected bands with a threshold between the peaks. */
+    std::vector<float> widths;
+    for (int i = 0; i < 20; ++i) widths.push_back(0.25f);
+    for (int i = 0; i < 20; ++i) widths.push_back(2.0f);
+
+    HistogramData result = DebugVizData::compute_histogram(widths, 0.1f);
+
+    int total = 0;
+    for (const auto& b : result.bins) total += b.count;
+    EXPECT_EQ(total, 40);
+    EXPECT_GE(result.bands.band_count, 2);
+    /* Threshold between the two peaks must lie between the cluster centres. */
+    EXPECT_GT(result.bands.thresholds[0], 0.25f);
+    EXPECT_LT(result.bands.thresholds[0], 2.0f);
+}
+
+TEST(DebugVizData, ClusterBounds_EmptyRegistry)
+{
+    DebugVizData dvd;
+    auto result = dvd.get_cluster_bounds(0, 0, FLT_MAX, FLT_MAX);
+    EXPECT_TRUE(result.empty());
+}
+
+TEST(DebugVizData, ClusterBounds_FullViewport_ReturnsAll)
+{
+    DebugVizData dvd;
+    dvd.register_cluster(make_cluster(1, fv_unit(0),  0,  0, 10, 10));
+    dvd.register_cluster(make_cluster(2, fv_unit(0), 20, 20, 30, 30));
+    dvd.register_cluster(make_cluster(3, fv_unit(0), 50, 50, 60, 60));
+
+    auto result = dvd.get_cluster_bounds(0, 0, FLT_MAX, FLT_MAX);
+    EXPECT_EQ(result.size(), 3u);
+}
+
+TEST(DebugVizData, ClusterBounds_ViewportFiltersCorrectly)
+{
+    DebugVizData dvd;
+    /* Cluster 1 fully inside [0,0,15,15]; cluster 2 outside. */
+    dvd.register_cluster(make_cluster(1, fv_unit(0),  0,  0, 10, 10));
+    dvd.register_cluster(make_cluster(2, fv_unit(0), 20, 20, 30, 30));
+
+    auto result = dvd.get_cluster_bounds(0, 0, 15, 15);
+    ASSERT_EQ(result.size(), 1u);
+    EXPECT_EQ(result[0].cluster_id, 1);
+    EXPECT_FLOAT_EQ(result[0].bounds[0],  0.0f);
+    EXPECT_FLOAT_EQ(result[0].bounds[2], 10.0f);
+}
+
+TEST(DebugVizData, ClusterBounds_OverlapEdge_Included)
+{
+    DebugVizData dvd;
+    /* Cluster straddles the right edge of the viewport — should be included. */
+    dvd.register_cluster(make_cluster(7, fv_unit(0), 8, 0, 12, 5));
+    auto result = dvd.get_cluster_bounds(0, 0, 10, 10);
+    ASSERT_EQ(result.size(), 1u);
+    EXPECT_EQ(result[0].cluster_id, 7);
 }
