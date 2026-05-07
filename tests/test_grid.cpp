@@ -1,3 +1,2 @@
 #include <gtest/gtest.h>
-
-// Placeholder — tests for the grid module will be added here.
+// grid tests — add cases here as the module is implemented
