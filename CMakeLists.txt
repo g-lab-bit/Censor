@@ -171,7 +171,6 @@ if(CENSOR_BUILD_TESTS)
     )
     gtest_discover_tests(test_grid)
 
-<<<<<<< HEAD
     foreach(module storage classifier overlay)
         add_executable(test_${module}
             tests/test_${module}.cpp
