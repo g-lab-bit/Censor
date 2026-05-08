@@ -131,6 +131,7 @@ if(CENSOR_BUILD_TESTS)
     gtest_discover_tests(test_smoke_dlopen)
 
     # ---------------------------------------------------------------------------
+<<<<<<< HEAD
     # test_clustering — internal module; compiles sources directly to access
     # symbols hidden by the shared-library visibility preset.
     # ---------------------------------------------------------------------------
