@@ -171,7 +171,7 @@ if(CENSOR_BUILD_TESTS)
     )
     gtest_discover_tests(test_grid)
 
-    foreach(module storage classifier)
+    foreach(module storage classifier label_palette)
         add_executable(test_${module}
             tests/test_${module}.cpp
         )
