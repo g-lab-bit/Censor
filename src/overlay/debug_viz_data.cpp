@@ -67,6 +67,20 @@ int find_valley(const std::vector<int>& counts, int left_peak, int right_peak)
 } /* anonymous namespace */
 
 /* ---------------------------------------------------------------------------
+ * Debug mode flag
+ * -------------------------------------------------------------------------*/
+
+void DebugVizData::set_debug_enabled(bool enabled) noexcept
+{
+    debug_enabled_.store(enabled);
+}
+
+bool DebugVizData::is_debug_enabled() const noexcept
+{
+    return debug_enabled_.load();
+}
+
+/* ---------------------------------------------------------------------------
  * Cluster registry
  * -------------------------------------------------------------------------*/
 
@@ -80,6 +94,7 @@ void DebugVizData::clear()
 {
     std::lock_guard<std::mutex> lock(mu_);
     clusters_.clear();
+    timings_.clear();
 }
 
 /* ---------------------------------------------------------------------------
@@ -201,6 +216,32 @@ std::vector<ClusterBoundsEntry> DebugVizData::get_cluster_bounds(
             result.push_back(entry);
         }
     }
+    return result;
+}
+
+/* ---------------------------------------------------------------------------
+ * API 4 — Inference timing
+ * -------------------------------------------------------------------------*/
+
+void DebugVizData::record_inference(int cluster_id, float elapsed_us)
+{
+    if (!debug_enabled_.load()) return;
+    std::lock_guard<std::mutex> lock(mu_);
+    timings_[cluster_id] = elapsed_us;
+}
+
+InferenceTiming DebugVizData::get_inference_timing(int cluster_id) const
+{
+    InferenceTiming result;
+    result.cluster_id = cluster_id;
+    if (!debug_enabled_.load()) return result; /* found stays false */
+
+    std::lock_guard<std::mutex> lock(mu_);
+    auto it = timings_.find(cluster_id);
+    if (it == timings_.end()) return result;
+
+    result.found      = true;
+    result.elapsed_us = it->second;
     return result;
 }
 

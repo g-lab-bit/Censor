@@ -3,6 +3,7 @@
 
 #include "iclassifier.h"
 #include "overlay/confidence_overlay.h"
+#include "overlay/debug_viz_data.h"
 #include "censor_types.h"
 
 #include <atomic>
@@ -27,8 +28,11 @@ namespace censor {
  * -------------------------------------------------------------------------*/
 class __attribute__((visibility("default"))) BackgroundWorker {
 public:
+    /* debug_viz: optional pointer to DebugVizData for inference timing.
+     * Timing is recorded only when debug_viz is non-null and debug mode enabled. */
     BackgroundWorker(std::shared_ptr<IClassifier> classifier,
-                     ConfidenceOverlay& overlay);
+                     ConfidenceOverlay& overlay,
+                     DebugVizData* debug_viz = nullptr);
     ~BackgroundWorker();
 
     /* Start the worker thread (idempotent; no-op if already running). */
@@ -49,6 +53,7 @@ private:
 
     std::shared_ptr<IClassifier> classifier_;
     ConfidenceOverlay&           overlay_;
+    DebugVizData*                debug_viz_;
 
     std::thread             thread_;
     std::atomic<bool>       running_{false};

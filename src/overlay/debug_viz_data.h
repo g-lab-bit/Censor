@@ -3,6 +3,7 @@
 
 #include "censor_types.h"
 
+#include <atomic>
 #include <map>
 #include <mutex>
 #include <vector>
@@ -55,19 +56,38 @@ struct ClusterBoundsEntry {
 };
 
 /* ---------------------------------------------------------------------------
- * DebugVizData — cluster registry + three debug visualization data APIs.
+ * InferenceTiming — per-cluster classify latency for API 4.
+ * elapsed_us: wall-clock microseconds spent inside IClassifier::predict().
+ * found==false when no timing has been recorded for cluster_id yet.
+ * -------------------------------------------------------------------------*/
+struct InferenceTiming {
+    int   cluster_id = -1;
+    float elapsed_us = 0.0f;
+    bool  found      = false;
+};
+
+/* ---------------------------------------------------------------------------
+ * DebugVizData — cluster registry + four debug visualization data APIs.
  *
  * Rapida renders; Censor provides the data. These are the observation tools
  * for the seeding run (SPEC-censor-core.md §10 Phase 2, SPEC-censor-ui.md §8).
+ *
+ * Debug mode flag: when disabled (default), inference timing is not recorded
+ * and get_inference_timing always returns found==false. Set enabled before
+ * wiring BackgroundWorker to start collecting data.
  *
  * Thread-safe: all methods are safe from any thread.
  * -------------------------------------------------------------------------*/
 class DebugVizData {
 public:
+    /* Toggle the debug overlay on/off. Thread-safe. */
+    void set_debug_enabled(bool enabled) noexcept;
+    bool is_debug_enabled() const noexcept;
+
     /* Register or update a cluster in the internal registry. */
     void register_cluster(const Cluster& cluster);
 
-    /* Remove all registered clusters. */
+    /* Remove all registered clusters and all timing records. */
     void clear();
 
     /* API 1 — Feature vector overlay.
@@ -90,9 +110,21 @@ public:
         float viewport_x0, float viewport_y0,
         float viewport_x1, float viewport_y1) const;
 
+    /* API 4 — Inference timing.
+     * Record wall-clock microseconds spent in IClassifier::predict() for a
+     * cluster. No-op when debug mode is disabled.
+     * Called by BackgroundWorker on the worker thread. */
+    void record_inference(int cluster_id, float elapsed_us);
+
+    /* Retrieve the most recently recorded timing for cluster_id.
+     * found==false when no timing exists or debug mode is disabled. */
+    InferenceTiming get_inference_timing(int cluster_id) const;
+
 private:
+    std::atomic<bool>      debug_enabled_{false};
     mutable std::mutex     mu_;
     std::map<int, Cluster> clusters_; /* keyed by cluster_id */
+    std::map<int, float>   timings_;  /* cluster_id → elapsed_us */
 };
 
 } /* namespace censor */

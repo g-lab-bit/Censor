@@ -534,6 +534,137 @@ TEST(DebugVizData, ClusterBounds_OverlapEdge_Included)
 }
 
 /* ========================================================================== */
+/* DebugVizData — debug mode flag + inference timing (API 4)                  */
+/* ========================================================================== */
+
+TEST(DebugVizData, DebugMode_DefaultOff)
+{
+    DebugVizData dvd;
+    EXPECT_FALSE(dvd.is_debug_enabled());
+}
+
+TEST(DebugVizData, DebugMode_Toggle)
+{
+    DebugVizData dvd;
+    dvd.set_debug_enabled(true);
+    EXPECT_TRUE(dvd.is_debug_enabled());
+    dvd.set_debug_enabled(false);
+    EXPECT_FALSE(dvd.is_debug_enabled());
+}
+
+TEST(DebugVizData, InferenceTiming_NotFoundWhenDebugOff)
+{
+    DebugVizData dvd;
+    /* record_inference is a no-op when debug is disabled */
+    dvd.record_inference(1, 42.0f);
+    EXPECT_FALSE(dvd.get_inference_timing(1).found);
+}
+
+TEST(DebugVizData, InferenceTiming_NotFoundForUnknownCluster)
+{
+    DebugVizData dvd;
+    dvd.set_debug_enabled(true);
+    auto result = dvd.get_inference_timing(99);
+    EXPECT_EQ(result.cluster_id, 99);
+    EXPECT_FALSE(result.found);
+}
+
+TEST(DebugVizData, InferenceTiming_RecordedAndRetrieved)
+{
+    DebugVizData dvd;
+    dvd.set_debug_enabled(true);
+    dvd.record_inference(7, 123.5f);
+
+    auto result = dvd.get_inference_timing(7);
+    ASSERT_TRUE(result.found);
+    EXPECT_EQ(result.cluster_id, 7);
+    EXPECT_FLOAT_EQ(result.elapsed_us, 123.5f);
+}
+
+TEST(DebugVizData, InferenceTiming_UpdateOverwritesPrevious)
+{
+    DebugVizData dvd;
+    dvd.set_debug_enabled(true);
+    dvd.record_inference(3, 50.0f);
+    dvd.record_inference(3, 75.0f);
+
+    EXPECT_FLOAT_EQ(dvd.get_inference_timing(3).elapsed_us, 75.0f);
+}
+
+TEST(DebugVizData, InferenceTiming_ClearRemovesAll)
+{
+    DebugVizData dvd;
+    dvd.set_debug_enabled(true);
+    dvd.record_inference(1, 10.0f);
+    dvd.record_inference(2, 20.0f);
+    dvd.clear();
+
+    EXPECT_FALSE(dvd.get_inference_timing(1).found);
+    EXPECT_FALSE(dvd.get_inference_timing(2).found);
+}
+
+TEST(BackgroundWorker, RecordsTimingWhenDebugEnabled)
+{
+    ConfidenceOverlay ov;
+    DebugVizData dvd;
+    dvd.set_debug_enabled(true);
+
+    auto clf = std::make_shared<StubClassifier>("wall", 0.9f);
+    BackgroundWorker worker(clf, ov, &dvd);
+
+    Cluster c;
+    c.cluster_id = 5;
+    c.bounds[0] = 0; c.bounds[1] = 0; c.bounds[2] = 10; c.bounds[3] = 10;
+
+    worker.start();
+    worker.submit(c);
+    worker.stop();
+
+    auto t = dvd.get_inference_timing(5);
+    ASSERT_TRUE(t.found);
+    EXPECT_EQ(t.cluster_id, 5);
+    EXPECT_GE(t.elapsed_us, 0.0f); /* non-negative elapsed time */
+}
+
+TEST(BackgroundWorker, NoTimingWhenDebugDisabled)
+{
+    ConfidenceOverlay ov;
+    DebugVizData dvd;
+    /* debug disabled by default */
+
+    auto clf = std::make_shared<StubClassifier>("wall", 0.9f);
+    BackgroundWorker worker(clf, ov, &dvd);
+
+    Cluster c;
+    c.cluster_id = 6;
+    c.bounds[0] = 0; c.bounds[1] = 0; c.bounds[2] = 5; c.bounds[3] = 5;
+
+    worker.start();
+    worker.submit(c);
+    worker.stop();
+
+    EXPECT_FALSE(dvd.get_inference_timing(6).found);
+}
+
+TEST(BackgroundWorker, NoTimingWhenNoDebugViz)
+{
+    /* Existing usage without DebugVizData should still work correctly. */
+    ConfidenceOverlay ov;
+    auto clf = std::make_shared<StubClassifier>("duct", 0.8f);
+    BackgroundWorker worker(clf, ov); /* no debug_viz */
+
+    Cluster c;
+    c.cluster_id = 1;
+    c.bounds[0] = 0; c.bounds[1] = 0; c.bounds[2] = 1; c.bounds[3] = 1;
+
+    worker.start();
+    worker.submit(c);
+    worker.stop();
+
+    EXPECT_EQ(ov.snapshot().size(), 1u);
+}
+
+/* ========================================================================== */
 /* confidence_to_rgba tests                                                    */
 /* ========================================================================== */
 
