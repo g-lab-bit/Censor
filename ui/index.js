@@ -3,5 +3,8 @@ export { default as CellPopout }           from './CellPopout.jsx';
 export { default as CompletenessHUD }      from './CompletenessHUD.jsx';
 export { default as DiscoveryQueuePanel }  from './DiscoveryQueuePanel.jsx';
 export { default as SessionToast }         from './SessionToast.jsx';
+export { default as ConfidenceOverlay }    from './ConfidenceOverlay.jsx';
+export { default as LabelPalette }         from './LabelPalette.jsx';
 export { useGridOverlay }                  from './useGridOverlay.js';
 export { useCensorSession }                from './useCensorSession.js';
+export { useConfidenceOverlay }            from './useConfidenceOverlay.js';
