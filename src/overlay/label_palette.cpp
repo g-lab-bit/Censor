@@ -3,14 +3,15 @@
 
 #include <algorithm>
 #include <cctype>
+#include <string>
 
 namespace censor {
 
 namespace {
 
-/* AEC default palette: name, letter shortcut, slot 1-9. */
+/* AEC default palette: name, letter shortcut, slots 1-10. */
 struct DefaultEntry { const char* name; char key; };
-static constexpr DefaultEntry kDefaults[9] = {
+static constexpr DefaultEntry kDefaults[10] = {
     {"Wall",      'W'},
     {"Duct",      'D'},
     {"Pipe",      'P'},
@@ -20,6 +21,7 @@ static constexpr DefaultEntry kDefaults[9] = {
     {"Text",      'T'},
     {"Dimension", 'M'},
     {"Equipment", 'E'},
+    {"Skip",      'X'},  /* slot 10 — skip cluster without labeling */
 };
 
 } /* anonymous namespace */
@@ -30,8 +32,8 @@ static constexpr DefaultEntry kDefaults[9] = {
 
 LabelPalette::LabelPalette()
 {
-    entries_.reserve(9);
-    for (int i = 0; i < 9; ++i) {
+    entries_.reserve(10);
+    for (int i = 0; i < 10; ++i) {
         LabelEntry e;
         e.name  = kDefaults[i].name;
         e.slot  = i + 1;
@@ -169,6 +171,17 @@ int LabelPalette::label_count(const std::string& label) const
 bool LabelPalette::seeding_complete(const std::string& label) const
 {
     return label_count(label) >= SEEDING_THRESHOLD_PER_CLASS;
+}
+
+std::string LabelPalette::seeding_hint(const std::string& label) const
+{
+    if (label == "Skip") return {};
+    std::lock_guard<std::mutex> lk(mu_);
+    const LabelEntry* e = entry_for_label(label);
+    if (!e || e->count >= SEEDING_THRESHOLD_PER_CLASS) return {};
+    int remaining = SEEDING_THRESHOLD_PER_CLASS - e->count;
+    return "Need " + std::to_string(remaining) + " more " + label +
+           (remaining == 1 ? " label" : " labels") + " before predictions activate.";
 }
 
 /* --------------------------------------------------------------------------

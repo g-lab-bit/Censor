@@ -111,6 +111,12 @@ public:
     /* Returns true when a label's count meets SEEDING_THRESHOLD_PER_CLASS. */
     bool seeding_complete(const std::string& label) const;
 
+    /* Seeding hint for Rapida to display inline in the palette.
+     * Returns "Need N more <label> labels before predictions activate."
+     * when below SEEDING_THRESHOLD_PER_CLASS, otherwise returns "".
+     * Returns "" for Skip and unknown labels. */
+    std::string seeding_hint(const std::string& label) const;
+
     /* --- Custom labels ----------------------------------------------------- */
 
     /* Append a new custom label.  Assigns the next available slot index.

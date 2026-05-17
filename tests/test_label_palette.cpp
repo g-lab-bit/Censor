@@ -9,22 +9,48 @@
 using namespace censor;
 
 /* --------------------------------------------------------------------------
- * Construction — 9 default AEC slots
+ * Construction — 10 default AEC slots (9 classes + Skip)
  * -------------------------------------------------------------------------*/
 
-TEST(LabelPalette, DefaultsHaveNineSlots)
+TEST(LabelPalette, DefaultsHaveTenSlots)
 {
     LabelPalette p;
     auto entries = p.snapshot();
-    ASSERT_EQ(entries.size(), 9u);
+    ASSERT_EQ(entries.size(), 10u);
 }
 
-TEST(LabelPalette, DefaultSlotsNumberedOneToNine)
+TEST(LabelPalette, DefaultSlotsNumberedOneToTen)
 {
     LabelPalette p;
     auto entries = p.snapshot();
-    for (int i = 0; i < 9; ++i)
+    for (int i = 0; i < 10; ++i)
         EXPECT_EQ(entries[i].slot, i + 1);
+}
+
+TEST(LabelPalette, DefaultSkipSlotIsSlotTen)
+{
+    LabelPalette p;
+    auto entries = p.snapshot();
+    ASSERT_EQ(entries.size(), 10u);
+    EXPECT_EQ(entries[9].name, "Skip");
+    EXPECT_EQ(entries[9].slot, 10);
+    EXPECT_EQ(entries[9].key, 'X');
+}
+
+TEST(LabelPalette, XKeySelectsSkipSlot)
+{
+    LabelPalette p;
+    bool consumed = p.on_key('X');
+    EXPECT_TRUE(consumed);
+    EXPECT_EQ(p.active_label(), "Skip");
+    EXPECT_EQ(p.active_slot(), 10);
+}
+
+TEST(LabelPalette, AddCustomDuplicateSkipReturnsMinusOne)
+{
+    LabelPalette p;
+    /* "Skip" is already a built-in slot. */
+    EXPECT_EQ(p.add_custom("Skip"), -1);
 }
 
 TEST(LabelPalette, DefaultCountsAreZero)
@@ -253,8 +279,8 @@ TEST(LabelPalette, AddCustomAppendsSlot)
 {
     LabelPalette p;
     int slot = p.add_custom("Stair");
-    EXPECT_EQ(slot, 10);
-    EXPECT_EQ(p.snapshot().size(), 10u);
+    EXPECT_EQ(slot, 11);  /* Skip occupies slot 10 */
+    EXPECT_EQ(p.snapshot().size(), 11u);
 }
 
 TEST(LabelPalette, AddCustomDuplicateReturnsMinusOne)
@@ -263,7 +289,7 @@ TEST(LabelPalette, AddCustomDuplicateReturnsMinusOne)
     p.add_custom("Stair");
     int slot = p.add_custom("Stair");
     EXPECT_EQ(slot, -1);
-    EXPECT_EQ(p.snapshot().size(), 10u); /* no duplicate added */
+    EXPECT_EQ(p.snapshot().size(), 11u); /* no duplicate added */
 }
 
 TEST(LabelPalette, AddDuplicateOfDefaultReturnsMinusOne)
@@ -332,4 +358,51 @@ TEST(LabelPalette, SnapshotOrderedBySlot)
     auto snap = p.snapshot();
     for (size_t i = 1; i < snap.size(); ++i)
         EXPECT_LT(snap[i-1].slot, snap[i].slot);
+}
+
+/* --------------------------------------------------------------------------
+ * Seeding hint
+ * -------------------------------------------------------------------------*/
+
+TEST(LabelPalette, SeedingHintBelowThreshold)
+{
+    LabelPalette p;
+    /* No labels applied yet — should return the full hint. */
+    std::string hint = p.seeding_hint("Wall");
+    EXPECT_FALSE(hint.empty());
+    EXPECT_NE(hint.find("Wall"), std::string::npos);
+    EXPECT_NE(hint.find(std::to_string(SEEDING_THRESHOLD_PER_CLASS)), std::string::npos);
+}
+
+TEST(LabelPalette, SeedingHintAtThreshold)
+{
+    LabelPalette p;
+    for (int i = 0; i < SEEDING_THRESHOLD_PER_CLASS; ++i)
+        p.record_label("Duct");
+    EXPECT_TRUE(p.seeding_hint("Duct").empty());
+}
+
+TEST(LabelPalette, SeedingHintSingularVsPlural)
+{
+    LabelPalette p;
+    /* Apply SEEDING_THRESHOLD_PER_CLASS - 1 labels so remaining == 1. */
+    for (int i = 0; i < SEEDING_THRESHOLD_PER_CLASS - 1; ++i)
+        p.record_label("Pipe");
+    std::string hint = p.seeding_hint("Pipe");
+    /* Hint must be non-empty and must NOT contain "1 labels" (wrong plural). */
+    EXPECT_FALSE(hint.empty());
+    EXPECT_EQ(hint.find("1 labels"), std::string::npos);
+    EXPECT_NE(hint.find("1"), std::string::npos);
+}
+
+TEST(LabelPalette, SeedingHintForSkipIsEmpty)
+{
+    LabelPalette p;
+    EXPECT_TRUE(p.seeding_hint("Skip").empty());
+}
+
+TEST(LabelPalette, SeedingHintUnknownLabelIsEmpty)
+{
+    LabelPalette p;
+    EXPECT_TRUE(p.seeding_hint("Nonexistent").empty());
 }
