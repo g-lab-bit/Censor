@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
 # Gas Town: sync beads after every commit
 export PATH="$HOME/go/bin:$HOME/.local/bin:$PATH"
-(bd dolt pull && bd dolt push) &
+# Pull only at session start, not after every commit — post-commit pull overwrites local closes with stale remote state
+(bd dolt push) &
