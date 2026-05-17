@@ -12,6 +12,7 @@
 #include "censor_types.h"
 #include "classifier/iclassifier.h"
 
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -41,6 +42,41 @@ std::vector<DiscoveryEntry> compute_discovery_queue(
     const IClassifier&                classifier,
     int                               page,
     int                               top_n = 10);
+
+/* ---------------------------------------------------------------------------
+ * DiscoveryQueuePanel — side-panel state for the discovery queue UI.
+ *
+ * Censor owns the data; Rapida renders from entries().
+ * Call update() whenever labels change to refresh the queue.
+ * Thread-safe: all methods are safe from any thread.
+ * -------------------------------------------------------------------------*/
+class __attribute__((visibility("default"))) DiscoveryQueuePanel {
+public:
+    DiscoveryQueuePanel() = default;
+
+    void set_visible(bool v);
+    bool is_visible() const;
+    void toggle_visible();
+
+    /* Recompute the queue from the current page state.
+     * labeled_features must contain the feature vectors of all user-labeled
+     * clusters (caller builds this from clusters where user_labels[i] != ""). */
+    void update(
+        const std::vector<Cluster>&       clusters,
+        const std::vector<std::string>&   user_labels,
+        const std::vector<FeatureVector>& labeled_features,
+        const IClassifier&                classifier,
+        int                               page,
+        int                               top_n = 10);
+
+    /* Thread-safe copy of current queue entries. */
+    std::vector<DiscoveryEntry> entries() const;
+
+private:
+    mutable std::mutex          mu_;
+    bool                        visible_ = false;
+    std::vector<DiscoveryEntry> entries_;
+};
 
 } /* namespace censor */
 

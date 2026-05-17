@@ -67,4 +67,46 @@ std::vector<DiscoveryEntry> compute_discovery_queue(
     return candidates;
 }
 
+/* --------------------------------------------------------------------------
+ * DiscoveryQueuePanel
+ * -------------------------------------------------------------------------*/
+
+void DiscoveryQueuePanel::set_visible(bool v)
+{
+    std::lock_guard<std::mutex> lk(mu_);
+    visible_ = v;
+}
+
+bool DiscoveryQueuePanel::is_visible() const
+{
+    std::lock_guard<std::mutex> lk(mu_);
+    return visible_;
+}
+
+void DiscoveryQueuePanel::toggle_visible()
+{
+    std::lock_guard<std::mutex> lk(mu_);
+    visible_ = !visible_;
+}
+
+void DiscoveryQueuePanel::update(
+    const std::vector<Cluster>&       clusters,
+    const std::vector<std::string>&   user_labels,
+    const std::vector<FeatureVector>& labeled_features,
+    const IClassifier&                classifier,
+    int                               page,
+    int                               top_n)
+{
+    auto q = compute_discovery_queue(clusters, user_labels, labeled_features,
+                                     classifier, page, top_n);
+    std::lock_guard<std::mutex> lk(mu_);
+    entries_ = std::move(q);
+}
+
+std::vector<DiscoveryEntry> DiscoveryQueuePanel::entries() const
+{
+    std::lock_guard<std::mutex> lk(mu_);
+    return entries_;
+}
+
 } /* namespace censor */

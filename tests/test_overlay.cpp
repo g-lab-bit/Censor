@@ -656,3 +656,270 @@ TEST(SnapshotFiltered, ColorsAreTrafficLight)
         EXPECT_FLOAT_EQ(e.color[3], expected[3]);
     }
 }
+
+/* ========================================================================== */
+/* CompletenessHUD tests                                                       */
+/* ========================================================================== */
+
+TEST(CompletenessHUD, DefaultVisible)
+{
+    CompletenessHUD hud;
+    EXPECT_TRUE(hud.is_visible());
+}
+
+TEST(CompletenessHUD, ToggleVisible)
+{
+    CompletenessHUD hud;
+    hud.toggle_visible();
+    EXPECT_FALSE(hud.is_visible());
+    hud.toggle_visible();
+    EXPECT_TRUE(hud.is_visible());
+}
+
+TEST(CompletenessHUD, SetVisible)
+{
+    CompletenessHUD hud;
+    hud.set_visible(false);
+    EXPECT_FALSE(hud.is_visible());
+    hud.set_visible(true);
+    EXPECT_TRUE(hud.is_visible());
+}
+
+TEST(CompletenessHUD, EmptyPageReturnsZeroCounts)
+{
+    KNNClassifier clf;
+    CompletenessHUD hud;
+    CompletenessHUDData d = hud.snapshot({}, {}, clf);
+    EXPECT_EQ(d.total_clusters,  0);
+    EXPECT_EQ(d.labeled_count,   0);
+    EXPECT_EQ(d.auto_classified, 0);
+    EXPECT_EQ(d.remaining,       0);
+    EXPECT_FLOAT_EQ(d.pct_understood, 0.0f);
+}
+
+TEST(CompletenessHUD, AllUserLabeledFullCompleteness)
+{
+    KNNClassifier clf;
+    CompletenessHUD hud;
+    FeatureVector fv = fv_unit(0);
+    std::vector<Cluster> clusters = {make_cluster(0, fv), make_cluster(1, fv)};
+    std::vector<std::string> labels = {"wall", "duct"};
+
+    CompletenessHUDData d = hud.snapshot(clusters, labels, clf);
+    EXPECT_EQ(d.total_clusters, 2);
+    EXPECT_EQ(d.labeled_count,  2);
+    EXPECT_EQ(d.remaining,      0);
+    EXPECT_FLOAT_EQ(d.pct_understood, 1.0f);
+}
+
+TEST(CompletenessHUD, MixedLabeledAndUnknown)
+{
+    KNNClassifier clf;
+    CompletenessHUD hud;
+    FeatureVector fv = fv_unit(0);
+    std::vector<Cluster> clusters = {
+        make_cluster(0, fv), make_cluster(1, fv),
+        make_cluster(2, fv), make_cluster(3, fv),
+    };
+    std::vector<std::string> labels = {"wall", "", "duct", ""};
+
+    CompletenessHUDData d = hud.snapshot(clusters, labels, clf);
+    EXPECT_EQ(d.total_clusters, 4);
+    EXPECT_EQ(d.labeled_count,  2);
+    EXPECT_EQ(d.remaining,      2);
+    EXPECT_FLOAT_EQ(d.pct_understood, 0.5f);
+}
+
+TEST(CompletenessHUD, AutoClassifiedCountsSeparately)
+{
+    KNNClassifier clf;
+    seed_class(clf, fv_unit(0), "wall");
+
+    CompletenessHUD hud;
+    /* cluster 0: no user label, above threshold (auto-classified)
+     * cluster 1: orthogonal feature, not understood */
+    std::vector<Cluster> clusters = {
+        make_cluster(0, fv_unit(0)),
+        make_cluster(1, fv_unit(1)),
+    };
+    std::vector<std::string> labels = {"", ""};
+
+    CompletenessHUDData d = hud.snapshot(clusters, labels, clf);
+    EXPECT_EQ(d.labeled_count,   0);
+    EXPECT_GE(d.auto_classified, 1); /* at least the wall cluster */
+    EXPECT_GT(d.pct_understood,  0.0f);
+}
+
+TEST(CompletenessHUD, EstSecondsUnknownWithNoEvents)
+{
+    KNNClassifier clf;
+    CompletenessHUD hud;
+    FeatureVector fv = fv_unit(0);
+    std::vector<Cluster> clusters = {make_cluster(0, fv)};
+    std::vector<std::string> labels = {""};
+
+    CompletenessHUDData d = hud.snapshot(clusters, labels, clf);
+    EXPECT_FLOAT_EQ(d.est_seconds, -1.0f); /* no rate data */
+}
+
+TEST(CompletenessHUD, EstSecondsPositiveAfterLabelEvents)
+{
+    KNNClassifier clf;
+    CompletenessHUD hud;
+
+    /* Seed enough label events to establish a rate (need >= 2). */
+    hud.record_label_event();
+    hud.record_label_event();
+    hud.record_label_event();
+
+    FeatureVector fv = fv_unit(0);
+    /* 5 clusters, all unlabeled and no classifier — 5 remaining. */
+    std::vector<Cluster> clusters;
+    std::vector<std::string> labels;
+    for (int i = 0; i < 5; ++i) {
+        clusters.push_back(make_cluster(i, fv));
+        labels.push_back("");
+    }
+
+    CompletenessHUDData d = hud.snapshot(clusters, labels, clf);
+    EXPECT_GT(d.est_seconds, 0.0f);
+}
+
+TEST(CompletenessHUD, EstSecondsZeroWhenNothingRemaining)
+{
+    KNNClassifier clf;
+    CompletenessHUD hud;
+    hud.record_label_event();
+    hud.record_label_event();
+
+    FeatureVector fv = fv_unit(0);
+    std::vector<Cluster> clusters = {make_cluster(0, fv)};
+    std::vector<std::string> labels = {"wall"}; /* nothing remaining */
+
+    CompletenessHUDData d = hud.snapshot(clusters, labels, clf);
+    /* remaining==0, so est_seconds stays -1 (no work left to estimate). */
+    EXPECT_FLOAT_EQ(d.est_seconds, -1.0f);
+}
+
+TEST(CompletenessHUD, VisibleFlagCarriedIntoSnapshot)
+{
+    KNNClassifier clf;
+    CompletenessHUD hud;
+    hud.set_visible(false);
+
+    CompletenessHUDData d = hud.snapshot({}, {}, clf);
+    EXPECT_FALSE(d.visible);
+}
+
+/* ========================================================================== */
+/* DiscoveryQueuePanel tests                                                   */
+/* ========================================================================== */
+
+TEST(DiscoveryQueuePanel, DefaultNotVisible)
+{
+    DiscoveryQueuePanel panel;
+    EXPECT_FALSE(panel.is_visible());
+}
+
+TEST(DiscoveryQueuePanel, ToggleVisible)
+{
+    DiscoveryQueuePanel panel;
+    panel.toggle_visible();
+    EXPECT_TRUE(panel.is_visible());
+    panel.toggle_visible();
+    EXPECT_FALSE(panel.is_visible());
+}
+
+TEST(DiscoveryQueuePanel, SetVisible)
+{
+    DiscoveryQueuePanel panel;
+    panel.set_visible(true);
+    EXPECT_TRUE(panel.is_visible());
+    panel.set_visible(false);
+    EXPECT_FALSE(panel.is_visible());
+}
+
+TEST(DiscoveryQueuePanel, InitialEntriesEmpty)
+{
+    DiscoveryQueuePanel panel;
+    EXPECT_TRUE(panel.entries().empty());
+}
+
+TEST(DiscoveryQueuePanel, UpdatePopulatesEntries)
+{
+    KNNClassifier clf;
+    DiscoveryQueuePanel panel;
+
+    FeatureVector lf  = fv_unit(0);
+    FeatureVector fv1 = fv_unit(1);
+    std::vector<Cluster> clusters = {
+        make_cluster(0, lf),   /* user-labeled — excluded */
+        make_cluster(1, fv1),  /* unknown — included */
+    };
+    std::vector<std::string> labels = {"wall", ""};
+    std::vector<FeatureVector> labeled_fvs = {lf};
+
+    panel.update(clusters, labels, labeled_fvs, clf, /*page=*/0);
+    auto e = panel.entries();
+    ASSERT_EQ(e.size(), 1u);
+    EXPECT_EQ(e[0].cluster_id, 1);
+}
+
+TEST(DiscoveryQueuePanel, UpdateRefreshesOnLabelChange)
+{
+    KNNClassifier clf;
+    DiscoveryQueuePanel panel;
+
+    FeatureVector lf  = fv_unit(0);
+    FeatureVector fv1 = fv_unit(1);
+    FeatureVector fv2 = fv_unit(2);
+    std::vector<Cluster> clusters = {
+        make_cluster(0, fv1),
+        make_cluster(1, fv2),
+    };
+    std::vector<std::string> labels = {"", ""};
+    std::vector<FeatureVector> labeled_fvs = {lf};
+
+    panel.update(clusters, labels, labeled_fvs, clf, 0);
+    EXPECT_EQ(panel.entries().size(), 2u);
+
+    /* Label cluster 0 — it should disappear from the queue. */
+    labels[0] = "wall";
+    labeled_fvs.push_back(fv1);
+    panel.update(clusters, labels, labeled_fvs, clf, 0);
+    auto e = panel.entries();
+    ASSERT_EQ(e.size(), 1u);
+    EXPECT_EQ(e[0].cluster_id, 1);
+}
+
+TEST(DiscoveryQueuePanel, UpdateEmptyWhenNoLabeledFeatures)
+{
+    KNNClassifier clf;
+    DiscoveryQueuePanel panel;
+
+    FeatureVector fv = fv_unit(0);
+    std::vector<Cluster> clusters = {make_cluster(0, fv)};
+    std::vector<std::string> labels = {""};
+    std::vector<FeatureVector> labeled_fvs; /* empty */
+
+    panel.update(clusters, labels, labeled_fvs, clf, 0);
+    EXPECT_TRUE(panel.entries().empty());
+}
+
+TEST(DiscoveryQueuePanel, TopNRespected)
+{
+    KNNClassifier clf;
+    DiscoveryQueuePanel panel;
+
+    FeatureVector labeled_fv = fv_unit(0);
+    std::vector<FeatureVector> labeled_fvs = {labeled_fv};
+    std::vector<Cluster> clusters;
+    std::vector<std::string> labels;
+    for (int i = 0; i < 15; ++i) {
+        clusters.push_back(make_cluster(i, fv_unit(1)));
+        labels.push_back("");
+    }
+
+    panel.update(clusters, labels, labeled_fvs, clf, 0, /*top_n=*/5);
+    EXPECT_EQ(panel.entries().size(), 5u);
+}
