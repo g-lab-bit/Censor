@@ -17,6 +17,18 @@ distributed separately.
 
 ---
 
+## Non-Negotiables
+
+- DLL boundary is plain C only — NO C++ symbols across `censor_abi.h`; binary compatibility breaks the moment a C++ type crosses the DLL edge
+- Censor NEVER links libmupdf or libpdfium — consume primitives through `rapida_vector_engine_c.h` only
+- Censor is READ-ONLY — it NEVER writes to Rapida's document state, annotation store, or any memory it doesn't own
+- SQLite amalgamation is the ONLY storage — zero external dependencies beyond what ships inside the DLL
+- R-tree spatial index is built LAZILY — NEVER triggered on the tile hot path (first interactive query, not page load)
+- On load failure or ABI mismatch, `censor_load()` returns null/error — Rapida degrades gracefully; Censor must NEVER call `abort()`, `exit()`, or throw C++ exceptions across the DLL boundary
+- `SPEC-censor-integration.md` in the Rapida rig is the authoritative C ABI contract — when it conflicts with Censor-side specs, the Rapida spec wins
+
+---
+
 ## Architecture
 
 ```
