@@ -532,3 +532,127 @@ TEST(DebugVizData, ClusterBounds_OverlapEdge_Included)
     ASSERT_EQ(result.size(), 1u);
     EXPECT_EQ(result[0].cluster_id, 7);
 }
+
+/* ========================================================================== */
+/* confidence_to_rgba tests                                                    */
+/* ========================================================================== */
+
+TEST(ConfidenceToRgba, HighConfidenceIsGreen)
+{
+    auto c = confidence_to_rgba(0.90f);
+    EXPECT_GT(c[1], c[0]); /* g > r */
+    EXPECT_GT(c[1], c[2]); /* g > b */
+    EXPECT_FLOAT_EQ(c[3], 0.90f);
+}
+
+TEST(ConfidenceToRgba, MediumConfidenceIsYellow)
+{
+    auto c = confidence_to_rgba(0.60f);
+    EXPECT_GT(c[0], 0.5f); /* r high */
+    EXPECT_GT(c[1], 0.5f); /* g high */
+    EXPECT_LT(c[2], 0.5f); /* b low  */
+    EXPECT_FLOAT_EQ(c[3], 0.60f);
+}
+
+TEST(ConfidenceToRgba, LowConfidenceIsRed)
+{
+    auto c = confidence_to_rgba(0.20f);
+    EXPECT_GT(c[0], c[1]); /* r > g */
+    EXPECT_GT(c[0], c[2]); /* r > b */
+    EXPECT_FLOAT_EQ(c[3], 0.20f);
+}
+
+TEST(ConfidenceToRgba, BoundaryAt075IsGreen)
+{
+    auto c = confidence_to_rgba(0.75f);
+    EXPECT_GT(c[1], c[0]);
+}
+
+TEST(ConfidenceToRgba, BoundaryAt040IsYellow)
+{
+    auto c = confidence_to_rgba(0.40f);
+    EXPECT_GT(c[0], 0.5f);
+    EXPECT_GT(c[1], 0.5f);
+    EXPECT_LT(c[2], 0.5f);
+}
+
+/* ========================================================================== */
+/* ConfidenceOverlay::snapshot_filtered tests                                 */
+/* ========================================================================== */
+
+TEST(SnapshotFiltered, DefaultStateReturnsAll)
+{
+    ConfidenceOverlay ov;
+    float b[4] = {0, 0, 1, 1};
+    ov.update(1, b, {"wall", 0.9f, true});
+    ov.update(2, b, {"duct", 0.5f, true});
+    ov.update_user_label(3, b, "pipe");
+
+    OverlayUIState state; /* predictions_visible=true, min_confidence=0 */
+    EXPECT_EQ(ov.snapshot_filtered(state).size(), 3u);
+}
+
+TEST(SnapshotFiltered, PredictionsHiddenExcludesAI)
+{
+    ConfidenceOverlay ov;
+    float b[4] = {0, 0, 1, 1};
+    ov.update(1, b, {"wall", 0.9f, true});           /* AI prediction */
+    ov.update_user_label(2, b, "pipe");              /* user label    */
+
+    OverlayUIState state{/*predictions_visible=*/false, /*min_confidence=*/0.0f};
+    auto snap = ov.snapshot_filtered(state);
+    ASSERT_EQ(snap.size(), 1u);
+    EXPECT_EQ(snap[0].cluster_id, 2);
+    EXPECT_TRUE(snap[0].is_user_labeled);
+}
+
+TEST(SnapshotFiltered, ThresholdFiltersLowConfidence)
+{
+    ConfidenceOverlay ov;
+    float b[4] = {0, 0, 1, 1};
+    ov.update(1, b, {"wall", 0.9f, true});
+    ov.update(2, b, {"duct", 0.3f, true});
+    ov.update(3, b, {"pipe", 0.6f, true});
+
+    OverlayUIState state{true, /*min_confidence=*/0.5f};
+    auto snap = ov.snapshot_filtered(state);
+    ASSERT_EQ(snap.size(), 2u);
+    for (const auto& e : snap)
+        EXPECT_GE(e.confidence, 0.5f);
+}
+
+TEST(SnapshotFiltered, UserLabelsNotFilteredByThreshold)
+{
+    /* User labels always pass even when their confidence (1.0) would
+     * normally pass anyway — but ensure the flag is honoured and no
+     * threshold is applied to them regardless. */
+    ConfidenceOverlay ov;
+    float b[4] = {0, 0, 1, 1};
+    ov.update_user_label(1, b, "wall");
+
+    OverlayUIState state{true, /*min_confidence=*/0.99f};
+    auto snap = ov.snapshot_filtered(state);
+    ASSERT_EQ(snap.size(), 1u);
+    EXPECT_TRUE(snap[0].is_user_labeled);
+}
+
+TEST(SnapshotFiltered, ColorsAreTrafficLight)
+{
+    ConfidenceOverlay ov;
+    float b[4] = {0, 0, 1, 1};
+    ov.update(1, b, {"wall", 0.9f,  true}); /* high   → green  */
+    ov.update(2, b, {"duct", 0.55f, true}); /* medium → yellow */
+    ov.update(3, b, {"pipe", 0.20f, true}); /* low    → red    */
+
+    OverlayUIState state;
+    auto snap = ov.snapshot_filtered(state);
+    ASSERT_EQ(snap.size(), 3u);
+
+    for (const auto& e : snap) {
+        auto expected = confidence_to_rgba(e.confidence);
+        EXPECT_FLOAT_EQ(e.color[0], expected[0]);
+        EXPECT_FLOAT_EQ(e.color[1], expected[1]);
+        EXPECT_FLOAT_EQ(e.color[2], expected[2]);
+        EXPECT_FLOAT_EQ(e.color[3], expected[3]);
+    }
+}

@@ -131,7 +131,6 @@ if(CENSOR_BUILD_TESTS)
     gtest_discover_tests(test_smoke_dlopen)
 
     # ---------------------------------------------------------------------------
-<<<<<<< HEAD
     # test_clustering — internal module; compiles sources directly to access
     # symbols hidden by the shared-library visibility preset.
     # ---------------------------------------------------------------------------
@@ -172,7 +171,7 @@ if(CENSOR_BUILD_TESTS)
     )
     gtest_discover_tests(test_grid)
 
-    foreach(module storage classifier overlay)
+    foreach(module storage classifier)
         add_executable(test_${module}
             tests/test_${module}.cpp
         )
