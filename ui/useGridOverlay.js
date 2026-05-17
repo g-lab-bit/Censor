@@ -16,7 +16,9 @@
  * Returns:
  *   overlayData, popoutData — current snapshots
  *   active                 — classification mode on/off
+ *   showWeightBands        — weight-band coloring on/off (grid + popout)
  *   toggleMode()           — toggles classification mode
+ *   toggleWeightBands()    — toggles stroke weight band visualization
  *   handleCellClick(r, c)  — sets active cell + refreshes popout
  *   handleCellHover(r, c)  — sets hovered cell (pass -1,-1 for none)
  *   refresh()              — pull latest snapshots from Censor
@@ -25,9 +27,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 
 export function useGridOverlay(censorApi, { pollIntervalMs = 0 } = {}) {
-  const [active,      setActive]      = useState(false);
-  const [overlayData, setOverlayData] = useState(null);
-  const [popoutData,  setPopoutData]  = useState(null);
+  const [active,          setActive]          = useState(false);
+  const [overlayData,     setOverlayData]     = useState(null);
+  const [popoutData,      setPopoutData]      = useState(null);
+  const [showWeightBands, setShowWeightBands] = useState(false);
 
   const apiRef = useRef(censorApi);
   useEffect(() => { apiRef.current = censorApi; }, [censorApi]);
@@ -60,6 +63,10 @@ export function useGridOverlay(censorApi, { pollIntervalMs = 0 } = {}) {
     });
   }, [refresh]);
 
+  const toggleWeightBands = useCallback(() => {
+    setShowWeightBands(b => !b);
+  }, []);
+
   const handleCellClick = useCallback((row, col) => {
     const api = apiRef.current;
     if (!api) return;
@@ -87,7 +94,9 @@ export function useGridOverlay(censorApi, { pollIntervalMs = 0 } = {}) {
     active,
     overlayData,
     popoutData,
+    showWeightBands,
     toggleMode,
+    toggleWeightBands,
     handleCellClick,
     handleCellHover,
     closePopout,

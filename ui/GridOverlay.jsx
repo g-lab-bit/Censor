@@ -4,20 +4,24 @@
  * Rapida mounts this on top of its PDF canvas.  The component reads
  * `overlayData` (shaped like GridOverlayData from the C++ API) and draws:
  *   - 1 px grid lines at 30 % opacity (zoom-independent screen-space)
- *   - Subtle tint on cells with classified clusters
+ *   - Subtle tint on cells with classified clusters (or weight bands when showWeightBands)
  *   - Highlighted border on the active (clicked) cell
  *
  * Hotkey 'C' toggles classification mode on/off.
  *
  * Props
  * -----
- * overlayData   {lines, cells, active_row, active_col}  — from censor API
- * transform     {scale, tx, ty}  — maps page-space px to canvas-space px
- * active        boolean          — is classification mode on?
- * onToggle      () => void       — called when C key pressed
- * onCellClick   (row, col) => void
- * onCellHover   (row, col) => void  — called with (-1,-1) on mouse-leave
- * labelColors   {[label]: [r,g,b]}  — color overrides; falls back to defaults
+ * overlayData     {lines, cells, active_row, active_col}  — from censor API
+ * transform       {scale, tx, ty}  — maps page-space px to canvas-space px
+ * active          boolean          — is classification mode on?
+ * onToggle        () => void       — called when C key pressed
+ * onCellClick     (row, col) => void
+ * onCellHover     (row, col) => void  — called with (-1,-1) on mouse-leave
+ * labelColors     {[label]: [r,g,b]}  — color overrides; falls back to defaults
+ * showWeightBands boolean          — color cells by dominant_weight_band instead of label
+ *
+ * Cell data shape — Phase 2 addition (optional):
+ *   cell.dominant_weight_band  'thin' | 'medium' | 'heavy' | null
  */
 
 import { useRef, useEffect, useCallback } from 'react';
@@ -37,10 +41,21 @@ const DEFAULT_COLORS = {
   equipment: [160, 100, 200],
 };
 
+// Matches SPEC-censor-core.md §2 stroke weight bands
+const WEIGHT_BAND_COLORS = {
+  thin:   [ 80, 180, 220],  // sky blue  — annotations/text
+  medium: [220, 160,  80],  // amber     — MEP/partitions
+  heavy:  [ 80, 100, 200],  // indigo    — walls/structure
+};
+
 function labelRgb(label, labelColors) {
   if (labelColors && labelColors[label]) return labelColors[label];
   const lc = label ? label.toLowerCase() : '';
   return DEFAULT_COLORS[lc] || [150, 150, 150];
+}
+
+function weightBandRgb(band) {
+  return WEIGHT_BAND_COLORS[band] || [150, 150, 150];
 }
 
 /* ---------------------------------------------------------------------------
@@ -65,7 +80,7 @@ function hitCell(cx, cy, cells, transform) {
 /* ---------------------------------------------------------------------------
  * Drawing
  * -------------------------------------------------------------------------*/
-function draw(ctx, canvas, overlayData, transform, labelColors) {
+function draw(ctx, canvas, overlayData, transform, labelColors, showWeightBands) {
   const { width, height } = canvas;
   ctx.clearRect(0, 0, width, height);
 
@@ -78,13 +93,17 @@ function draw(ctx, canvas, overlayData, transform, labelColors) {
   const sx = x => x * scale + tx;
   const sy = y => y * scale + ty;
 
-  /* ── Cell fills (classified = subtle tint, active = highlighted border) ── */
+  /* ── Cell fills — label tint or weight-band tint; active/hover borders ── */
   for (const cell of cells) {
     const [x0, y0, x1, y1] = cell.bounds;
     const cx0 = sx(x0), cy0 = sy(y0), cx1 = sx(x1), cy1 = sy(y1);
     const cw = cx1 - cx0, ch = cy1 - cy0;
 
-    if (cell.has_clusters && cell.dominant_label) {
+    if (showWeightBands && cell.dominant_weight_band) {
+      const [r, g, b] = weightBandRgb(cell.dominant_weight_band);
+      ctx.fillStyle = `rgba(${r},${g},${b},0.15)`;
+      ctx.fillRect(cx0, cy0, cw, ch);
+    } else if (cell.has_clusters && cell.dominant_label) {
       const [r, g, b] = labelRgb(cell.dominant_label, labelColors);
       ctx.fillStyle = `rgba(${r},${g},${b},0.12)`;
       ctx.fillRect(cx0, cy0, cw, ch);
@@ -125,12 +144,13 @@ function draw(ctx, canvas, overlayData, transform, labelColors) {
  * -------------------------------------------------------------------------*/
 export default function GridOverlay({
   overlayData,
-  transform = { scale: 1, tx: 0, ty: 0 },
-  active    = false,
+  transform       = { scale: 1, tx: 0, ty: 0 },
+  active          = false,
   onToggle,
   onCellClick,
   onCellHover,
   labelColors,
+  showWeightBands = false,
   style,
 }) {
   const canvasRef = useRef(null);
@@ -141,11 +161,11 @@ export default function GridOverlay({
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (active && overlayData) {
-      draw(ctx, canvas, overlayData, transform, labelColors);
+      draw(ctx, canvas, overlayData, transform, labelColors, showWeightBands);
     } else {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
-  }, [overlayData, transform, active, labelColors]);
+  }, [overlayData, transform, active, labelColors, showWeightBands]);
 
   /* Resize canvas to match its CSS layout size. */
   useEffect(() => {
@@ -156,11 +176,11 @@ export default function GridOverlay({
       canvas.width  = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
-      if (active && overlayData) draw(ctx, canvas, overlayData, transform, labelColors);
+      if (active && overlayData) draw(ctx, canvas, overlayData, transform, labelColors, showWeightBands);
     });
     ro.observe(canvas);
     return () => ro.disconnect();
-  }, [overlayData, transform, active, labelColors]);
+  }, [overlayData, transform, active, labelColors, showWeightBands]);
 
   /* Hotkey 'C' toggles classification mode. */
   useEffect(() => {
