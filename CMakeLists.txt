@@ -215,6 +215,24 @@ if(CENSOR_BUILD_TESTS)
     gtest_discover_tests(test_overlay)
 
     # ---------------------------------------------------------------------------
+    # test_confusable_popover — confusable negative popover + rejection toast.
+    # ---------------------------------------------------------------------------
+    add_executable(test_confusable_popover
+        tests/test_confusable_popover.cpp
+        src/overlay/confusable_popover.cpp
+        src/overlay/rejection_toast.cpp
+    )
+    target_include_directories(test_confusable_popover PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests
+    )
+    target_link_libraries(test_confusable_popover PRIVATE
+        GTest::gtest_main
+    )
+    gtest_discover_tests(test_confusable_popover)
+
+    # ---------------------------------------------------------------------------
     # test_test_utils — exercises the synthetic data generators in test_utils.h.
     # Header-only; no censor shared library needed — only GTest.
     # ---------------------------------------------------------------------------
