@@ -160,6 +160,7 @@ if(CENSOR_BUILD_TESTS)
     add_executable(test_grid
         tests/test_grid.cpp
         src/grid/grid_system.cpp
+        src/grid/grid_overlay.cpp
     )
     target_include_directories(test_grid PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
