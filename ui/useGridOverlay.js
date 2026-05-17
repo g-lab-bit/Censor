@@ -12,6 +12,8 @@
  *   clearActiveCell()
  *   setHoveredCell(row, col)
  *   clearHoveredCell()
+ *   labelCluster(cluster_id, label, is_user_override)  → void
+ *   getSuggestions()  → ConfusableSuggestion[] | null
  *
  * Returns:
  *   overlayData, popoutData — current snapshots
@@ -19,6 +21,7 @@
  *   toggleMode()           — toggles classification mode
  *   handleCellClick(r, c)  — sets active cell + refreshes popout
  *   handleCellHover(r, c)  — sets hovered cell (pass -1,-1 for none)
+ *   handleClusterLabel(cluster_id, label) — label cluster + return suggestions
  *   refresh()              — pull latest snapshots from Censor
  */
 
@@ -83,6 +86,16 @@ export function useGridOverlay(censorApi, { pollIntervalMs = 0 } = {}) {
       : prev);
   }, []);
 
+  /* Label a cluster, refresh overlay, and return confusable suggestions.
+   * Rapida feeds the returned array to useConfusableNegative.feedSuggestions(). */
+  const handleClusterLabel = useCallback((cluster_id, label) => {
+    const api = apiRef.current;
+    if (!api) return [];
+    api.labelCluster?.(cluster_id, label, false);
+    setOverlayData(api.getOverlayData() ?? null);
+    return api.getSuggestions?.() ?? [];
+  }, []);
+
   return {
     active,
     overlayData,
@@ -90,6 +103,7 @@ export function useGridOverlay(censorApi, { pollIntervalMs = 0 } = {}) {
     toggleMode,
     handleCellClick,
     handleCellHover,
+    handleClusterLabel,
     closePopout,
     refresh,
   };
