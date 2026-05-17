@@ -88,4 +88,36 @@ std::vector<CensorOverlayEntry> ConfidenceOverlay::snapshot() const
     return out;
 }
 
+std::array<float, 4> confidence_to_rgba(float confidence)
+{
+    if (confidence >= 0.75f)
+        return {0.20f, 0.80f, 0.20f, confidence}; /* green  — high   */
+    if (confidence >= 0.40f)
+        return {0.90f, 0.80f, 0.10f, confidence}; /* yellow — medium */
+    return     {0.90f, 0.20f, 0.20f, confidence}; /* red    — low    */
+}
+
+std::vector<CensorOverlayEntry> ConfidenceOverlay::snapshot_filtered(
+    const OverlayUIState& state) const
+{
+    std::lock_guard<std::mutex> lock(mu_);
+    std::vector<CensorOverlayEntry> out;
+    out.reserve(entries_.size());
+    for (const auto& kv : entries_) {
+        const CensorOverlayEntry& e = kv.second;
+        if (!e.is_user_labeled) {
+            if (!state.predictions_visible) continue;
+            if (e.confidence < state.min_confidence) continue;
+        }
+        CensorOverlayEntry copy = e;
+        auto rgba = confidence_to_rgba(copy.confidence);
+        copy.color[0] = rgba[0];
+        copy.color[1] = rgba[1];
+        copy.color[2] = rgba[2];
+        copy.color[3] = rgba[3];
+        out.push_back(std::move(copy));
+    }
+    return out;
+}
+
 } /* namespace censor */

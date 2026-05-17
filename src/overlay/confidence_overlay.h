@@ -18,6 +18,28 @@ namespace censor {
 __attribute__((visibility("default")))
 std::array<float, 3> label_to_rgb(const std::string& label);
 
+/* Traffic-light RGBA from confidence score.
+ *   >= 0.75 → green  (high)
+ *   >= 0.40 → yellow (medium)
+ *   <  0.40 → red    (low)
+ * Alpha is set to confidence so low-confidence regions are more transparent.
+ * Returns {r, g, b, a} in [0, 1]. */
+__attribute__((visibility("default")))
+std::array<float, 4> confidence_to_rgba(float confidence);
+
+/* ---------------------------------------------------------------------------
+ * OverlayUIState — rendering control passed to snapshot_filtered().
+ *
+ * predictions_visible: when false, AI-predicted entries are hidden; only
+ *   user-labeled entries are returned.
+ * min_confidence: entries with confidence < min_confidence are excluded.
+ *   Corresponds to a UI threshold slider in [0, 1].
+ * -------------------------------------------------------------------------*/
+struct __attribute__((visibility("default"))) OverlayUIState {
+    bool  predictions_visible = true;
+    float min_confidence      = 0.0f;
+};
+
 /* ---------------------------------------------------------------------------
  * ConfidenceOverlay — manages per-cluster overlay render data.
  *
@@ -45,6 +67,13 @@ public:
 
     /* Thread-safe snapshot of all current entries for rendering. */
     std::vector<CensorOverlayEntry> snapshot() const;
+
+    /* Filtered snapshot applying OverlayUIState rules:
+     * - Excludes AI-predicted entries when predictions_visible is false.
+     * - Excludes entries with confidence < min_confidence.
+     * - Overrides entry color with traffic-light confidence_to_rgba. */
+    std::vector<CensorOverlayEntry> snapshot_filtered(
+        const OverlayUIState& state) const;
 
 private:
     mutable std::mutex              mu_;
