@@ -9,6 +9,8 @@
 #ifndef CENSOR_DISCOVERY_QUEUE_H
 #define CENSOR_DISCOVERY_QUEUE_H
 
+
+#include "censor_visibility.h"
 #include "censor_types.h"
 #include "classifier/iclassifier.h"
 
@@ -34,7 +36,7 @@ struct DiscoveryEntry {
  * labeled_features: feature vectors of all user-labeled clusters (positive
  * examples). The caller constructs this from clusters where user_labels[i]
  * is non-empty. Returns empty when labeled_features is empty. */
-__attribute__((visibility("default")))
+CENSOR_API
 std::vector<DiscoveryEntry> compute_discovery_queue(
     const std::vector<Cluster>&       clusters,
     const std::vector<std::string>&   user_labels,
@@ -50,7 +52,7 @@ std::vector<DiscoveryEntry> compute_discovery_queue(
  * Call update() whenever labels change to refresh the queue.
  * Thread-safe: all methods are safe from any thread.
  * -------------------------------------------------------------------------*/
-class __attribute__((visibility("default"))) DiscoveryQueuePanel {
+class CENSOR_API DiscoveryQueuePanel {
 public:
     DiscoveryQueuePanel() = default;
 

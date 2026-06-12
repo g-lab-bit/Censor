@@ -212,7 +212,7 @@ TEST(DiscoveryQueue, SortedFurthestFirst)
     EXPECT_FLOAT_EQ(q[0].max_distance, 1.0f);
     EXPECT_FLOAT_EQ(q[1].max_distance, 1.0f);
     /* Last entry is the near one. */
-    EXPECT_FLOAT_EQ(q[2].cluster_id, 0);
+    EXPECT_EQ(q[2].cluster_id, 0);  /* cluster_id is int — EXPECT_FLOAT_EQ was an int->float C4244 */
     EXPECT_LT(q[2].max_distance, 1.0f);
 }
 

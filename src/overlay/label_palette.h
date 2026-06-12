@@ -11,6 +11,8 @@
 #ifndef CENSOR_LABEL_PALETTE_H
 #define CENSOR_LABEL_PALETTE_H
 
+
+#include "censor_visibility.h"
 #include "classifier/knn_classifier.h"  /* SEEDING_THRESHOLD_PER_CLASS */
 
 #include <array>
@@ -55,7 +57,7 @@ enum class ClickMode { ADD, REMOVE };
  *   5. In continuous click mode (continuous_mode()==true) Rapida calls
  *      active_label() directly instead of re-opening the palette.
  * -------------------------------------------------------------------------*/
-class __attribute__((visibility("default"))) LabelPalette {
+class CENSOR_API LabelPalette {
 public:
     /* Constructs palette pre-loaded with 9 AEC default entries. */
     LabelPalette();

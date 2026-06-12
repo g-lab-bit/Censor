@@ -15,6 +15,8 @@
 #ifndef CENSOR_DB_H
 #define CENSOR_DB_H
 
+
+#include "censor_visibility.h"
 #include "censor_types.h"
 
 #include <string>
@@ -73,7 +75,7 @@ struct PatternEntry {
 /* ---------------------------------------------------------------------------
  * CensorDb — RAII wrapper around an SQLite connection.
  * -------------------------------------------------------------------------*/
-class __attribute__((visibility("default"))) CensorDb {
+class CENSOR_API CensorDb {
 public:
     CensorDb() = default;
     ~CensorDb();

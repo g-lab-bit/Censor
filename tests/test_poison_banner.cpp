@@ -11,6 +11,8 @@
 #include "censor_abi.h"
 #include <gtest/gtest.h>
 #include <atomic>
+#include <cstdint>
+#include <cstdio>
 #include <cstring>
 
 /* ---------------------------------------------------------------------------
@@ -34,8 +36,10 @@ struct MockHost {
         auto* h = static_cast<MockHost*>(ud);
         h->fatal_call_count.fetch_add(1, std::memory_order_relaxed);
         if (reason) {
-            std::strncpy(h->last_fatal_reason, reason,
-                         sizeof(h->last_fatal_reason) - 1);
+            /* snprintf: portable + truncation-safe (strncpy is C4996 under
+             * MSVC /WX and doesn't guarantee NUL termination). */
+            std::snprintf(h->last_fatal_reason,
+                          sizeof(h->last_fatal_reason), "%s", reason);
         }
     }
 
@@ -101,7 +105,8 @@ TEST(PoisonBanner, AttachEngineFiresFatalCallbackOnce)
     auto cb = host.make_callbacks();
     ASSERT_EQ(0, censor_init(&cb));
 
-    EXPECT_EQ(0, censor_attach_engine(reinterpret_cast<void*>(0xdeadbeef)));
+    EXPECT_EQ(0, censor_attach_engine(
+        reinterpret_cast<void*>(static_cast<uintptr_t>(0xdeadbeefu))));
 
     /* Callback must have fired exactly once. */
     EXPECT_EQ(1, host.fatal_call_count.load());

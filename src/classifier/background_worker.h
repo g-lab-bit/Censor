@@ -1,6 +1,8 @@
 #ifndef CENSOR_BACKGROUND_WORKER_H
 #define CENSOR_BACKGROUND_WORKER_H
 
+
+#include "censor_visibility.h"
 #include "iclassifier.h"
 #include "overlay/confidence_overlay.h"
 #include "overlay/debug_viz_data.h"
@@ -26,7 +28,7 @@ namespace censor {
  * Lifecycle: start() → submit(…) × N → stop().
  * stop() drains the pending queue before the thread exits.
  * -------------------------------------------------------------------------*/
-class __attribute__((visibility("default"))) BackgroundWorker {
+class CENSOR_API BackgroundWorker {
 public:
     /* debug_viz: optional pointer to DebugVizData for inference timing.
      * Timing is recorded only when debug_viz is non-null and debug mode enabled. */

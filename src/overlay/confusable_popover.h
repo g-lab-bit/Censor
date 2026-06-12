@@ -11,6 +11,8 @@
 #ifndef CENSOR_CONFUSABLE_POPOVER_H
 #define CENSOR_CONFUSABLE_POPOVER_H
 
+
+#include "censor_visibility.h"
 #include "censor_types.h"
 
 #include <deque>
@@ -54,7 +56,7 @@ struct PopoverResult {
  *      Each action pops the front item and returns it for routing to ActiveLearner.
  *   4. dismiss() clears all remaining items without acting on them.
  * -------------------------------------------------------------------------*/
-class __attribute__((visibility("default"))) ConfusablePopover {
+class CENSOR_API ConfusablePopover {
 public:
     /* Load a new batch, replacing any existing queue. */
     void load(std::vector<PopoverItem> items);

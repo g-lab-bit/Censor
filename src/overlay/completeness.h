@@ -8,6 +8,8 @@
 #ifndef CENSOR_COMPLETENESS_H
 #define CENSOR_COMPLETENESS_H
 
+
+#include "censor_visibility.h"
 #include "censor_types.h"
 #include "classifier/iclassifier.h"
 
@@ -21,7 +23,7 @@ namespace censor {
 /* Returns fraction of clusters that are understood (0.0–1.0).
  * user_labels[i] is the user-applied label for clusters[i]; empty string = unlabeled.
  * Returns 0.0 when clusters is empty. */
-__attribute__((visibility("default")))
+CENSOR_API
 float compute_completeness(
     const std::vector<Cluster>&     clusters,
     const std::vector<std::string>& user_labels,
@@ -33,7 +35,7 @@ float compute_completeness(
  * est_seconds == -1 means insufficient labeling rate data (fewer than 2
  * label events in the last 60 seconds).
  * -------------------------------------------------------------------------*/
-struct __attribute__((visibility("default"))) CompletenessHUDData {
+struct CENSOR_API CompletenessHUDData {
     int   total_clusters  = 0;
     int   labeled_count   = 0;    /* user-applied labels */
     int   auto_classified = 0;    /* above threshold, not user-labeled */
@@ -50,7 +52,7 @@ struct __attribute__((visibility("default"))) CompletenessHUDData {
  * snapshot() derives the current HUD data from the page state and rate.
  * Thread-safe: all methods are safe from any thread.
  * -------------------------------------------------------------------------*/
-class __attribute__((visibility("default"))) CompletenessHUD {
+class CENSOR_API CompletenessHUD {
 public:
     CompletenessHUD() = default;
 

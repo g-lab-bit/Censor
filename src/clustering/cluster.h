@@ -11,10 +11,6 @@ namespace censor {
 inline constexpr float CLUSTER_PROXIMITY_TOLERANCE = 10.0f;
 }
 
-// Mark internal C++ symbols so they appear in the shared-library dynamic
-// symbol table and remain reachable from test executables.
-#ifdef _MSC_VER
-#  define CENSOR_API __declspec(dllexport)
-#else
-#  define CENSOR_API __attribute__((visibility("default")))
-#endif
+// CENSOR_API (internal-symbol visibility) moved to its own header so every
+// module can use it without depending on clustering (ce-hcy).
+#include "censor_visibility.h"

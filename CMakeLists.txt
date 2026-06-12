@@ -27,7 +27,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Compiler warnings
 # ---------------------------------------------------------------------------
 if(MSVC)
-    add_compile_options(/W4 /WX)
+    # /wd4251 /wd4275: dll-interface warnings for std:: members of CENSOR_API
+    # classes — standard cross-platform-DLL suppression; the DLL and its tests
+    # are always built together with the same toolchain/CRT (ce-hcy).
+    add_compile_options(/W4 /WX /wd4251 /wd4275)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()
@@ -44,6 +47,10 @@ endif()
 add_library(sqlite3_obj OBJECT third_party/sqlite/sqlite3.c)
 target_include_directories(sqlite3_obj PUBLIC third_party/sqlite)
 set_target_properties(sqlite3_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if(MSVC)
+    # Third-party amalgamation is not /W4-clean; don't let /WX block the build.
+    target_compile_options(sqlite3_obj PRIVATE /w /WX-)
+endif()
 
 # ---------------------------------------------------------------------------
 # censor shared library (the DLL)
@@ -65,6 +72,9 @@ set_target_properties(censor PROPERTIES
     OUTPUT_NAME "censor"
     PREFIX      ""   # No "lib" prefix on Linux either — matches "censor.dll"
 )
+
+# ce-hcy: CENSOR_API resolves to dllexport while building the DLL on MSVC.
+target_compile_definitions(censor PRIVATE CENSOR_BUILD_DLL)
 
 # ---------------------------------------------------------------------------
 # Tests
@@ -181,6 +191,8 @@ if(CENSOR_BUILD_TESTS)
             ${CMAKE_CURRENT_SOURCE_DIR}/include
             ${CMAKE_CURRENT_SOURCE_DIR}/tests
         )
+        # ce-hcy: these tests link the DLL — CENSOR_API resolves to dllimport.
+        target_compile_definitions(test_${module} PRIVATE CENSOR_USE_DLL)
         target_link_libraries(test_${module} PRIVATE
             censor
             GTest::gtest_main

@@ -11,6 +11,8 @@
 #ifndef CENSOR_ACTIVE_LEARNING_H
 #define CENSOR_ACTIVE_LEARNING_H
 
+
+#include "censor_visibility.h"
 #include "censor_types.h"
 #include "classifier/iclassifier.h"
 #include "storage/censor_db.h"
@@ -35,7 +37,7 @@ struct Suggestion {
     float         confidence  = 0.0f; /* classifier confidence at query time */
 };
 
-class __attribute__((visibility("default"))) ActiveLearner {
+class CENSOR_API ActiveLearner {
 public:
     ActiveLearner(CensorDb& db, IClassifier& classifier);
 

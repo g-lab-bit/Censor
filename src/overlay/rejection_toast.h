@@ -11,6 +11,8 @@
 #ifndef CENSOR_REJECTION_TOAST_H
 #define CENSOR_REJECTION_TOAST_H
 
+
+#include "censor_visibility.h"
 #include <chrono>
 #include <mutex>
 #include <string>
@@ -28,7 +30,7 @@ struct ToastSnapshot {
  * Rapida calls current() each frame; the toast self-expires after
  * DISPLAY_DURATION_MS without Rapida needing to call dismiss().
  * -------------------------------------------------------------------------*/
-class __attribute__((visibility("default"))) RejectionToast {
+class CENSOR_API RejectionToast {
 public:
     static constexpr int DISPLAY_DURATION_MS = 2000;
 

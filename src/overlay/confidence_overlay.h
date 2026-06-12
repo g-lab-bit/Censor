@@ -1,6 +1,8 @@
 #ifndef CENSOR_CONFIDENCE_OVERLAY_H
 #define CENSOR_CONFIDENCE_OVERLAY_H
 
+
+#include "censor_visibility.h"
 #include "censor_types.h"
 #include "classifier/iclassifier.h"
 
@@ -15,7 +17,7 @@ namespace censor {
 /* Deterministic RGB colour from a label string (hue derived from hash).
  * Returns {r, g, b} in [0, 1]. Combined with confidence as alpha to
  * produce the "class colour at confidence opacity" specified by the plugin. */
-__attribute__((visibility("default")))
+CENSOR_API
 std::array<float, 3> label_to_rgb(const std::string& label);
 
 /* Traffic-light RGBA from confidence score.
@@ -24,7 +26,7 @@ std::array<float, 3> label_to_rgb(const std::string& label);
  *   <  0.40 → red    (low)
  * Alpha is set to confidence so low-confidence regions are more transparent.
  * Returns {r, g, b, a} in [0, 1]. */
-__attribute__((visibility("default")))
+CENSOR_API
 std::array<float, 4> confidence_to_rgba(float confidence);
 
 /* ---------------------------------------------------------------------------
@@ -35,7 +37,7 @@ std::array<float, 4> confidence_to_rgba(float confidence);
  * min_confidence: entries with confidence < min_confidence are excluded.
  *   Corresponds to a UI threshold slider in [0, 1].
  * -------------------------------------------------------------------------*/
-struct __attribute__((visibility("default"))) OverlayUIState {
+struct CENSOR_API OverlayUIState {
     bool  predictions_visible = true;
     float min_confidence      = 0.0f;
 };
@@ -47,7 +49,7 @@ struct __attribute__((visibility("default"))) OverlayUIState {
  * activation threshold (ClassifyResult::above_threshold == true).
  * Thread-safe: update/remove/clear are safe from any thread.
  * -------------------------------------------------------------------------*/
-class __attribute__((visibility("default"))) ConfidenceOverlay {
+class CENSOR_API ConfidenceOverlay {
 public:
     /* Update or insert overlay entry for a classified cluster.
      * Ignored when result.above_threshold is false or result.label is empty. */
