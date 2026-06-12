@@ -137,9 +137,13 @@ TEST(KNNClassifier, EmptyClassifierReturnsEmpty)
 }
 
 /* ---------------------------------------------------------------------------
- * Test 6: label_counts — counts all examples (positive + negative).
+ * Test 6: label_counts — counts POSITIVE examples only (ce-o03).
+ *
+ * Negative examples must not be counted so the seeding-progress bar agrees
+ * with predict()'s activation guard (SEEDING_THRESHOLD_PER_CLASS counts
+ * positives only).  A negative "wall" example must not bump the wall count.
  * -------------------------------------------------------------------------*/
-TEST(KNNClassifier, LabelCountsReflectsAddedExamples)
+TEST(KNNClassifier, LabelCountsPositivesOnly)
 {
     KNNClassifier clf;
     FeatureVector wall = make_feature_vector("wall");
@@ -148,11 +152,69 @@ TEST(KNNClassifier, LabelCountsReflectsAddedExamples)
     clf.add_example(wall, "wall", false);
     clf.add_example(wall, "wall", false);
     clf.add_example(duct, "duct", false);
-    clf.add_example(wall, "wall", true);  /* negative example, still counted */
+    clf.add_example(wall, "wall", true);  /* negative — must NOT be counted */
 
     auto counts = clf.label_counts();
-    EXPECT_EQ(counts["wall"], 3);
+    EXPECT_EQ(counts["wall"], 2);  /* 2 positives, not 3 */
     EXPECT_EQ(counts["duct"], 1);
+}
+
+/* ---------------------------------------------------------------------------
+ * Test 8: label_counts — label with only negatives is absent from the map.
+ * -------------------------------------------------------------------------*/
+TEST(KNNClassifier, LabelCountsOmitsNegativeOnlyLabel)
+{
+    KNNClassifier clf;
+    FeatureVector duct = make_feature_vector("duct");
+
+    /* Add only negatives for "duct". */
+    for (int i = 0; i < 5; ++i)
+        clf.add_example(duct, "duct", /*is_negative=*/true);
+
+    auto counts = clf.label_counts();
+    /* "duct" must not appear because it has zero positives. */
+    EXPECT_EQ(counts.count("duct"), 0u);
+}
+
+/* ---------------------------------------------------------------------------
+ * Test 9: per-label FIFO cap (ce-f4i).
+ *
+ * Add MAX_EXAMPLES_PER_LABEL + 3 examples for one label.
+ * The total positive-example count in label_counts must stay == MAX.
+ * -------------------------------------------------------------------------*/
+TEST(KNNClassifier, PerLabelCapEvictsOldestExample)
+{
+    KNNClassifier clf;
+    FeatureVector wall = make_feature_vector("wall");
+
+    const int over = MAX_EXAMPLES_PER_LABEL + 3;
+    for (int i = 0; i < over; ++i)
+        clf.add_example(wall, "wall", /*is_negative=*/false);
+
+    auto counts = clf.label_counts();
+    EXPECT_EQ(counts["wall"], MAX_EXAMPLES_PER_LABEL);
+}
+
+/* ---------------------------------------------------------------------------
+ * Test 10: cap is per-label; a second label is not affected (ce-f4i).
+ * -------------------------------------------------------------------------*/
+TEST(KNNClassifier, PerLabelCapDoesNotAffectOtherLabels)
+{
+    KNNClassifier clf;
+    FeatureVector wall = make_feature_vector("wall");
+    FeatureVector duct = make_feature_vector("duct");
+
+    /* Overflow "wall" by 3. */
+    for (int i = 0; i < MAX_EXAMPLES_PER_LABEL + 3; ++i)
+        clf.add_example(wall, "wall", false);
+
+    /* Add only 7 "duct" examples — below the cap. */
+    for (int i = 0; i < 7; ++i)
+        clf.add_example(duct, "duct", false);
+
+    auto counts = clf.label_counts();
+    EXPECT_EQ(counts["wall"], MAX_EXAMPLES_PER_LABEL);
+    EXPECT_EQ(counts["duct"], 7);
 }
 
 /* ---------------------------------------------------------------------------

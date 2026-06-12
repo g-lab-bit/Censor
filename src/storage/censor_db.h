@@ -18,7 +18,9 @@
 
 #include "censor_visibility.h"
 #include "censor_types.h"
+#include "classifier/iclassifier.h"
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -91,8 +93,18 @@ public:
     /* --- labeled_clusters ------------------------------------------------*/
     bool insert_label(const LabeledCluster& lc);
     std::vector<LabeledCluster> query_examples_by_label(const std::string& label) const;
-    /* Returns {label -> count} for every distinct label in labeled_clusters. */
+    /* Returns {label -> positive-count} for every distinct label in labeled_clusters.
+     * Counts POSITIVE examples only (is_negative=0); negatives are excluded so
+     * the seeding-progress bar matches predict()'s activation guard (ce-o03). */
     std::vector<std::pair<std::string, int>> count_per_class() const;
+
+    /* ce-f4i: iterate all rows in labeled_clusters in insertion order.
+     * Calls fn(feature_vector, label, is_negative) for each row.
+     * Returns false if the DB is closed or the query cannot be prepared. */
+    bool for_each_labeled_cluster(
+        const std::function<void(const FeatureVector&,
+                                 const std::string& label,
+                                 bool is_negative)>& fn) const;
 
     /* --- pending_suggestions --------------------------------------------*/
     bool insert_suggestion(const PendingSuggestion& ps);
@@ -109,6 +121,12 @@ private:
 
     sqlite3* db_ = nullptr;
 };
+
+/* ce-f4i: Load all labeled_clusters from db into clf via clf.add_example.
+ * Returns the total number of examples loaded (positives + negatives).
+ * Call once after CensorDb::open to restore the in-memory classifier from the
+ * persisted training set (labels survive process restart via this path). */
+CENSOR_API int hydrate_classifier(const CensorDb& db, IClassifier& clf);
 
 } /* namespace censor */
 

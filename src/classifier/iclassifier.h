@@ -29,7 +29,9 @@ public:
                              const std::string&   label,
                              bool                 is_negative) = 0;
 
-    /* Count of stored examples per label (includes negatives). */
+    /* Count of stored POSITIVE examples per label (negatives excluded).
+     * ce-o03: must match predict()'s activation guard so the seeding-progress
+     * bar (SPEC-censor-ui §3) reflects the same set the classifier acts on. */
     virtual std::map<std::string, int> label_counts() const = 0;
 };
 

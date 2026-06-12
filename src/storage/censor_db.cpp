@@ -3,11 +3,14 @@
  */
 
 #include "storage/censor_db.h"
+#include "classifier/iclassifier.h"
 
 #include <sqlite3.h>
 
 #include <chrono>
 #include <cstring>
+#include <filesystem>
+#include <functional>
 #include <iomanip>
 #include <sstream>
 
@@ -55,22 +58,71 @@ static FeatureVector unpack_fv(const void* blob, int bytes)
 
 bool CensorDb::open(const std::string& path)
 {
+    /* ce-h34(d): reject empty path */
+    if (path.empty()) return false;
+
     if (db_) close();
+
+    /* ce-h34(b): detect pre-existing file before sqlite3_open creates it. */
+    const bool file_existed = std::filesystem::exists(path);
+
     int rc = sqlite3_open(path.c_str(), &db_);
     if (rc != SQLITE_OK) {
-        sqlite3_close(db_);
+        /* ce-ey3: use sqlite3_close_v2 so prepared-statement leaks don't leave
+         * a dangling handle when SQLITE_BUSY is returned by sqlite3_close. */
+        sqlite3_close_v2(db_);
         db_ = nullptr;
         return false;
     }
-    sqlite3_exec(db_, "PRAGMA journal_mode=WAL;", nullptr, nullptr, nullptr);
-    sqlite3_exec(db_, "PRAGMA foreign_keys=ON;",  nullptr, nullptr, nullptr);
+
+    /* ce-h34(a): check PRAGMA return codes; close on failure. */
+    if (sqlite3_exec(db_, "PRAGMA journal_mode=WAL;",
+                     nullptr, nullptr, nullptr) != SQLITE_OK) {
+        sqlite3_close_v2(db_);
+        db_ = nullptr;
+        return false;
+    }
+    if (sqlite3_exec(db_, "PRAGMA foreign_keys=ON;",
+                     nullptr, nullptr, nullptr) != SQLITE_OK) {
+        sqlite3_close_v2(db_);
+        db_ = nullptr;
+        return false;
+    }
+
+    /* ce-h34(b): run integrity_check when the file pre-existed; treat any
+     * result other than "ok" as corrupt. */
+    if (file_existed) {
+        bool integrity_ok = false;
+        auto integrity_cb = [](void* ud, int, char** argv, char**) -> int {
+            /* First row of PRAGMA integrity_check must be "ok". */
+            if (argv && argv[0] && std::string(argv[0]) == "ok")
+                *static_cast<bool*>(ud) = true;
+            return 0;  /* returning non-zero would abort the query */
+        };
+        sqlite3_exec(db_, "PRAGMA integrity_check;",
+                     integrity_cb, &integrity_ok, nullptr);
+        if (!integrity_ok) {
+            sqlite3_close_v2(db_);
+            db_ = nullptr;
+            return false;
+        }
+    }
+
     return create_schema();
 }
+
+/* ce-h34: TODO — validate that path is under the application user-data
+ * directory before passing it to sqlite3_open (ce-h34 path-policy
+ * sub-item).  No call site exists yet; add when IPC input can supply path. */
 
 void CensorDb::close()
 {
     if (db_) {
-        sqlite3_close(db_);
+        /* ce-ey3: sqlite3_close_v2 deregisters the handle immediately even
+         * when prepared statements are still live; the handle is freed once
+         * the last statement is finalized.  sqlite3_close returns SQLITE_BUSY
+         * in that case and does NOT free the handle, leaving db_ dangling. */
+        sqlite3_close_v2(db_);
         db_ = nullptr;
     }
 }
@@ -126,6 +178,7 @@ bool CensorDb::create_schema()
 
 bool CensorDb::insert_label(const LabeledCluster& lc)
 {
+    if (!db_) return false;  /* ce-h34(c) */
     const char* sql =
         "INSERT INTO labeled_clusters"
         " (id, feature_vector, label, source_file, page_number, timestamp, confidence, is_negative)"
@@ -156,6 +209,7 @@ bool CensorDb::insert_label(const LabeledCluster& lc)
 
 std::vector<LabeledCluster> CensorDb::query_examples_by_label(const std::string& label) const
 {
+    if (!db_) return {};  /* ce-h34(c) */
     const char* sql =
         "SELECT id, feature_vector, label, source_file, page_number, timestamp, confidence, is_negative"
         " FROM labeled_clusters WHERE label=? ORDER BY timestamp;";
@@ -191,8 +245,14 @@ std::vector<LabeledCluster> CensorDb::query_examples_by_label(const std::string&
 
 std::vector<std::pair<std::string, int>> CensorDb::count_per_class() const
 {
+    /* ce-h34(c): guard against un-opened or failed-open state. */
+    if (!db_) return {};
+
+    /* ce-o03: count positive examples only so the seeding-progress bar reflects
+     * the same set that predict()'s activation guard counts. */
     const char* sql =
-        "SELECT label, COUNT(*) FROM labeled_clusters GROUP BY label ORDER BY label;";
+        "SELECT label, COUNT(*) FROM labeled_clusters"
+        " WHERE is_negative = 0 GROUP BY label ORDER BY label;";
 
     sqlite3_stmt* stmt = nullptr;
     std::vector<std::pair<std::string, int>> results;
@@ -214,6 +274,7 @@ std::vector<std::pair<std::string, int>> CensorDb::count_per_class() const
 
 bool CensorDb::insert_suggestion(const PendingSuggestion& ps)
 {
+    if (!db_) return false;  /* ce-h34(c) */
     const char* sql =
         "INSERT INTO pending_suggestions"
         " (id, cluster_ref, predicted_label, confidence, confirmed, corrected_label)"
@@ -245,6 +306,7 @@ bool CensorDb::insert_suggestion(const PendingSuggestion& ps)
 
 bool CensorDb::confirm_suggestion(const std::string& id)
 {
+    if (!db_) return false;  /* ce-h34(c) */
     const char* sql = "UPDATE pending_suggestions SET confirmed=1 WHERE id=?;";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK)
@@ -257,6 +319,7 @@ bool CensorDb::confirm_suggestion(const std::string& id)
 
 bool CensorDb::reject_suggestion(const std::string& id, const std::string& corrected_label)
 {
+    if (!db_) return false;  /* ce-h34(c) */
     const char* sql =
         "UPDATE pending_suggestions SET confirmed=0, corrected_label=? WHERE id=?;";
     sqlite3_stmt* stmt = nullptr;
@@ -276,6 +339,7 @@ bool CensorDb::reject_suggestion(const std::string& id, const std::string& corre
 
 bool CensorDb::upsert_pattern(const PatternEntry& pe)
 {
+    if (!db_) return false;  /* ce-h34(c) */
     std::string now = now_iso8601();
     const char* sql =
         "INSERT INTO pattern_library (id, label, feature_vector, example_count, created, modified, source)"
@@ -312,6 +376,7 @@ bool CensorDb::upsert_pattern(const PatternEntry& pe)
 
 std::vector<PatternEntry> CensorDb::all_patterns() const
 {
+    if (!db_) return {};  /* ce-h34(c) */
     const char* sql =
         "SELECT id, label, feature_vector, example_count, created, modified, source"
         " FROM pattern_library ORDER BY label;";
@@ -340,6 +405,58 @@ std::vector<PatternEntry> CensorDb::all_patterns() const
     }
     sqlite3_finalize(stmt);
     return results;
+}
+
+/* ---------------------------------------------------------------------------
+ * for_each_labeled_cluster — ce-f4i hydration helper
+ * -------------------------------------------------------------------------*/
+
+bool CensorDb::for_each_labeled_cluster(
+    const std::function<void(const FeatureVector&,
+                             const std::string& label,
+                             bool is_negative)>& fn) const
+{
+    if (!db_) return false;  /* ce-h34(c) */
+
+    const char* sql =
+        "SELECT feature_vector, label, is_negative"
+        " FROM labeled_clusters ORDER BY timestamp;";
+
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK)
+        return false;
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        FeatureVector fv = unpack_fv(
+            sqlite3_column_blob(stmt, 0),
+            sqlite3_column_bytes(stmt, 0));
+        const char* lbl_ptr =
+            reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+        std::string label = lbl_ptr ? lbl_ptr : "";
+        bool is_negative  = sqlite3_column_int(stmt, 2) != 0;
+        fn(fv, label, is_negative);
+    }
+    sqlite3_finalize(stmt);
+    return true;
+}
+
+/* ---------------------------------------------------------------------------
+ * hydrate_classifier — ce-f4i: load all labeled_clusters into a classifier.
+ *
+ * Returns the number of examples loaded (positives + negatives).
+ * Call once after CensorDb::open to restore in-memory training state from the
+ * persisted labeled_clusters table.
+ * -------------------------------------------------------------------------*/
+
+int hydrate_classifier(const CensorDb& db, IClassifier& clf)
+{
+    int count = 0;
+    db.for_each_labeled_cluster(
+        [&](const FeatureVector& fv, const std::string& label, bool is_negative) {
+            clf.add_example(fv, label, is_negative);
+            ++count;
+        });
+    return count;
 }
 
 } /* namespace censor */

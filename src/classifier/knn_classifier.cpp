@@ -23,25 +23,53 @@ float KNNClassifier::cosine_similarity(const FeatureVector& a,
 
 /* ---------------------------------------------------------------------------
  * add_example
+ *
+ * ce-f4i: per-label FIFO cap (MAX_EXAMPLES_PER_LABEL). When the count of
+ * stored examples for `label` reaches the cap, the OLDEST example for that
+ * label is erased before pushing the new one. examples_ is insertion-ordered,
+ * so the first matching element is always the oldest. O(n) — acceptable for
+ * the expected label count and call frequency.
  * -------------------------------------------------------------------------*/
 void KNNClassifier::add_example(const FeatureVector& features,
                                 const std::string&   label,
                                 bool                 is_negative)
 {
     std::unique_lock<std::shared_mutex> lk(mu_);  /* Censor-owf */
+
+    /* Count existing examples for this label. */
+    int label_count = 0;
+    for (const auto& ex : examples_) {
+        if (ex.label == label) ++label_count;
+    }
+
+    /* Evict the oldest example for this label if we are at the cap. */
+    if (label_count >= MAX_EXAMPLES_PER_LABEL) {
+        auto it = std::find_if(examples_.begin(), examples_.end(),
+                               [&label](const Example& ex) {
+                                   return ex.label == label;
+                               });
+        if (it != examples_.end()) {
+            examples_.erase(it);
+        }
+    }
+
     examples_.push_back({features, label, is_negative});
 }
 
 /* ---------------------------------------------------------------------------
  * label_counts
  *
- * Counts ALL stored examples (positive and negative) keyed by label.
+ * ce-o03: counts POSITIVE examples only (is_negative=false) keyed by label.
+ * Negative examples are excluded so the seeding-progress bar (driven by
+ * SEEDING_THRESHOLD_PER_CLASS) agrees with predict()'s activation guard,
+ * which already counts positives only.
  * -------------------------------------------------------------------------*/
 std::map<std::string, int> KNNClassifier::label_counts() const
 {
     std::shared_lock<std::shared_mutex> lk(mu_);  /* Censor-owf */
     std::map<std::string, int> counts;
     for (const auto& ex : examples_) {
+        if (ex.is_negative) continue;
         counts[ex.label]++;
     }
     return counts;

@@ -21,6 +21,10 @@ namespace censor {
 static constexpr int   KNN_K                      = 5;
 static constexpr int   SEEDING_THRESHOLD_PER_CLASS = 10;
 static constexpr float CLASSIFIER_CONFIDENCE_THRESHOLD = 0.80f;
+/* ce-f4i: cap per-label examples to bound predict() O(n) scan over long
+ * seeding sessions. Oldest example for the label is evicted when the cap is
+ * reached (FIFO per label, insertion order). */
+static constexpr int   MAX_EXAMPLES_PER_LABEL     = 500;
 
 class CENSOR_API KNNClassifier final : public IClassifier {
 public:
