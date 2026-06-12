@@ -1,6 +1,7 @@
 #include "grid/grid_overlay.h"
 
 #include <algorithm>
+#include <cassert>
 #include <map>
 
 namespace censor {
@@ -85,6 +86,13 @@ GridOverlayData GridOverlay::get_overlay_data() const
 
     for (int r = 0; r < rows; ++r) {
         for (int c = 0; c < cols; ++c) {
+            /* ce-m21: cell_at throws std::out_of_range for out-of-bounds indices.
+             * This loop iterates r in [0, rows) and c in [0, cols) drawn directly
+             * from grid_.rows()/grid_.cols() — the same values cell_at checks
+             * against — so the call is provably in-bounds. The assert documents
+             * this invariant; a future refactor that widens the range would catch
+             * the violation at debug time rather than throwing in production. */
+            assert(r >= 0 && r < rows && c >= 0 && c < cols);
             const GridCell& gc = grid_.cell_at(r, c);
             GridCellState   state;
             state.row          = r;

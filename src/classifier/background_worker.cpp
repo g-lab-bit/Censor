@@ -1,6 +1,7 @@
 #include "background_worker.h"
 
 #include <chrono>
+#include <exception>
 
 namespace censor {
 
@@ -64,6 +65,13 @@ void BackgroundWorker::worker_loop()
             queue_.pop();
         }
 
+        /* ce-m21: wrap per-job processing so that any exception (e.g. std::bad_alloc
+         * from an oversized histogram — see ce-dfq) does not kill the worker thread.
+         * No logger is available here so the exception is swallowed silently; the
+         * overlay entry for this cluster is simply not updated.
+         * TODO(ce-m21): wire a fatal-path callback here if a host API becomes
+         * available from the worker context. */
+        try {
         const Cluster& c = job.cluster;
         ClassifyResult result;
 
@@ -78,6 +86,8 @@ void BackgroundWorker::worker_loop()
         }
 
         overlay_.update(c.cluster_id, c.bounds, result);
+        } catch (const std::exception&) { /* swallow — loop must survive */ }
+        catch (...) { /* swallow — loop must survive */ }
     }
     running_.store(false);
 }

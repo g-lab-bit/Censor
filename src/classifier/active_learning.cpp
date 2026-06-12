@@ -4,6 +4,7 @@
 
 #include "classifier/active_learning.h"
 #include "classifier/knn_classifier.h" /* for CLASSIFIER_CONFIDENCE_THRESHOLD */
+#include "math_utils.h"                /* canonical cosine_similarity (ce-d8i) */
 
 #include <algorithm>
 #include <cmath>
@@ -36,19 +37,7 @@ static std::string generate_uuid()
     return ss.str();
 }
 
-static float cosine_similarity(const FeatureVector& a, const FeatureVector& b)
-{
-    float dot = 0.0f, na = 0.0f, nb = 0.0f;
-    for (int i = 0; i < FEATURE_DIM_COUNT; ++i) {
-        dot += a.dims[i] * b.dims[i];
-        na  += a.dims[i] * a.dims[i];
-        nb  += b.dims[i] * b.dims[i];
-    }
-    float denom = std::sqrt(na) * std::sqrt(nb);
-    if (denom < 1e-9f) return 0.0f;
-    float sim = dot / denom;
-    return sim < 0.0f ? 0.0f : (sim > 1.0f ? 1.0f : sim);
-}
+/* cosine_similarity: use canonical free function from math_utils.h (ce-d8i). */
 
 /* ---------------------------------------------------------------------------
  * ActiveLearner

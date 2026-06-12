@@ -1,21 +1,15 @@
 #include "discovery_queue.h"
+#include "math_utils.h"  /* canonical cosine_similarity (ce-d8i) */
 
 #include <algorithm>
 #include <cmath>
 
 namespace censor {
 
-/* Cosine similarity in [0, 1] for non-negative feature vectors. */
-static float cosine_sim(const FeatureVector& a, const FeatureVector& b)
+/* cosine_sim: alias to the canonical free function in math_utils.h (ce-d8i). */
+static inline float cosine_sim(const FeatureVector& a, const FeatureVector& b)
 {
-    float dot = 0.0f, na2 = 0.0f, nb2 = 0.0f;
-    for (int i = 0; i < FEATURE_DIM_COUNT; ++i) {
-        dot += a.dims[i] * b.dims[i];
-        na2 += a.dims[i] * a.dims[i];
-        nb2 += b.dims[i] * b.dims[i];
-    }
-    if (na2 == 0.0f || nb2 == 0.0f) return 0.0f;
-    return dot / (std::sqrt(na2) * std::sqrt(nb2));
+    return censor::cosine_similarity(a, b);
 }
 
 std::vector<DiscoveryEntry> compute_discovery_queue(

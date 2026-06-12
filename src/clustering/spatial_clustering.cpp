@@ -77,6 +77,12 @@ std::vector<Cluster> cluster_page(const std::vector<ElementData>& elements,
     const int n = static_cast<int>(elements.size());
     if (n == 0) return {};
 
+    /* DoS guard, see ce-590: the all-pairs union-find loop below is O(n^2) over
+     * stroked elements. A crafted page with more than MAX_CLUSTER_ELEMENTS paths
+     * would stall the BackgroundWorker for minutes; return empty so the overlay
+     * stays blank rather than hanging. */
+    if (n > MAX_CLUSTER_ELEMENTS) return {};
+
     // --- Phase 1: union-find over stroked elements (proximity + weight band) ---
 
     UnionFind uf(n);

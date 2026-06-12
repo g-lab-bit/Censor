@@ -1,4 +1,5 @@
 #include "knn_classifier.h"
+#include "math_utils.h"
 
 #include <algorithm>
 #include <cmath>
@@ -10,25 +11,14 @@ namespace censor {
 /* ---------------------------------------------------------------------------
  * cosine_similarity
  *
- * dot(a, b) / (|a| * |b|).  Returns 0 if either vector is all-zero to avoid
- * division by zero.  Result is in [-1, 1] mathematically; feature vectors are
- * non-negative so the result is effectively in [0, 1].
+ * Thin forwarder to the canonical free function in math_utils.h (ce-d8i).
+ * The canonical implementation adds an epsilon guard, NaN/Inf guard, and
+ * [0,1] clamping — see math_utils.h for the full contract (ce-zgy).
  * -------------------------------------------------------------------------*/
 float KNNClassifier::cosine_similarity(const FeatureVector& a,
                                        const FeatureVector& b)
 {
-    float dot  = 0.0f;
-    float na2  = 0.0f;
-    float nb2  = 0.0f;
-
-    for (int i = 0; i < FEATURE_DIM_COUNT; ++i) {
-        dot += a.dims[i] * b.dims[i];
-        na2 += a.dims[i] * a.dims[i];
-        nb2 += b.dims[i] * b.dims[i];
-    }
-
-    if (na2 == 0.0f || nb2 == 0.0f) return 0.0f;
-    return dot / (std::sqrt(na2) * std::sqrt(nb2));
+    return censor::cosine_similarity(a, b);
 }
 
 /* ---------------------------------------------------------------------------

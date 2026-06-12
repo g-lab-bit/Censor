@@ -1,4 +1,5 @@
 #include "clustering/stroke_weight_histogram.h"
+#include "clustering/cluster.h"  /* MAX_HISTOGRAM_BINS (ce-dfq) */
 
 #include <algorithm>
 #include <climits>
@@ -31,6 +32,16 @@ StrokeWeightBands analyze_stroke_weights(const std::vector<float>& stroke_widths
     // Build histogram.
     int n_bins = static_cast<int>(
         std::ceil((max_w - min_w) / STROKE_HISTOGRAM_BIN_WIDTH)) + 1;
+
+    /* DoS guard, see ce-dfq: adversarial stroke widths (e.g. {0.001, 1e9})
+     * produce ~1e10 bins, causing std::bad_alloc that kills the worker thread.
+     * Fall through to the single-band early-out shape when the cap is exceeded. */
+    if (n_bins > MAX_HISTOGRAM_BINS) {
+        result.band_count    = 1;
+        result.thresholds[0] = max_w + STROKE_HISTOGRAM_BIN_WIDTH;
+        return result;
+    }
+
     std::vector<int> hist(static_cast<size_t>(n_bins), 0);
     for (float w : valid) {
         int b = static_cast<int>((w - min_w) / STROKE_HISTOGRAM_BIN_WIDTH);

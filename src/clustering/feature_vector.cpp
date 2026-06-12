@@ -9,19 +9,30 @@ namespace censor {
 static constexpr int   ORI_BINS  = 18;            /* 10° per bin across [0, π/2] */
 static constexpr float HALF_PI_F = 1.57079632f;
 
-/* Angle of the major axis of an element's bounding box, in [0, π/2]. */
+/* ce-zgy: replace any non-finite float with 0.0f before use in feature math.
+ * A crafted PDF can produce NaN or Inf coordinates/widths; letting them
+ * propagate into FeatureVector dims would poison cosine_similarity and
+ * violate strict weak ordering in std::partial_sort (UB, crash). */
+static inline float sanitize(float v) noexcept
+{
+    return std::isfinite(v) ? v : 0.0f;
+}
+
+/* Angle of the major axis of an element's bounding box, in [0, π/2].
+ * ce-zgy: sanitize bounds so NaN coordinates from crafted PDFs map to 0.0f. */
 static float major_axis_angle(const ElementData& e)
 {
-    float w = e.bounds[2] - e.bounds[0];
-    float h = e.bounds[3] - e.bounds[1];
+    float w = sanitize(e.bounds[2]) - sanitize(e.bounds[0]);
+    float h = sanitize(e.bounds[3]) - sanitize(e.bounds[1]);
     return std::atan2(h, w);
 }
 
-/* Length along the major axis (longer bounding-box dimension). */
+/* Length along the major axis (longer bounding-box dimension).
+ * ce-zgy: sanitize bounds so NaN coordinates from crafted PDFs map to 0.0f. */
 static float major_axis_length(const ElementData& e)
 {
-    float w = e.bounds[2] - e.bounds[0];
-    float h = e.bounds[3] - e.bounds[1];
+    float w = sanitize(e.bounds[2]) - sanitize(e.bounds[0]);
+    float h = sanitize(e.bounds[3]) - sanitize(e.bounds[1]);
     return std::max(w, h);
 }
 
@@ -47,8 +58,9 @@ FeatureVector compute_features(
 
     /* --- dims from cluster bounds (no per-element loop needed) ------------ */
 
-    float bw = cluster.bounds[2] - cluster.bounds[0];
-    float bh = cluster.bounds[3] - cluster.bounds[1];
+    /* ce-zgy: sanitize cluster bounds before arithmetic. */
+    float bw = sanitize(cluster.bounds[2]) - sanitize(cluster.bounds[0]);
+    float bh = sanitize(cluster.bounds[3]) - sanitize(cluster.bounds[1]);
 
     fv.dims[ELEMENT_COUNT] =
         static_cast<float>(cluster.element_indices.size());       /* dim 10 */
@@ -82,26 +94,30 @@ FeatureVector compute_features(
         if (e.is_filled) {
             ++fill_count;
             ++loop_count;                                /* closed-loop proxy */
-            float ew = e.bounds[2] - e.bounds[0];
-            float eh = e.bounds[3] - e.bounds[1];
+            /* ce-zgy: sanitize bounds before arithmetic to block NaN from crafted PDFs. */
+            float ew = sanitize(e.bounds[2]) - sanitize(e.bounds[0]);
+            float eh = sanitize(e.bounds[3]) - sanitize(e.bounds[1]);
             loop_area += ew * eh;                        /* shoelace proxy    */
         }
 
         if (e.is_stroked) {
             float angle  = major_axis_angle(e);
             float length = major_axis_length(e);
+            /* ce-zgy: sanitize stroke_width before use in feature accumulation. */
+            float sw = sanitize(e.stroke_width);
 
             total_stroke_len    += length;
-            total_stroke_weight += e.stroke_width;
-            band_sum += static_cast<float>(weight_to_band(e.stroke_width, weight_bands));
+            total_stroke_weight += sw;
+            band_sum += static_cast<float>(weight_to_band(sw, weight_bands));
             ++stroked_count;
 
             int bin = static_cast<int>((angle / HALF_PI_F) * ORI_BINS);
             bin = std::clamp(bin, 0, ORI_BINS - 1);
             ori_hist[static_cast<std::size_t>(bin)]++;
 
-            float cx = (e.bounds[0] + e.bounds[2]) * 0.5f;
-            float cy = (e.bounds[1] + e.bounds[3]) * 0.5f;
+            /* ce-zgy: sanitize centroid coordinates. */
+            float cx = (sanitize(e.bounds[0]) + sanitize(e.bounds[2])) * 0.5f;
+            float cy = (sanitize(e.bounds[1]) + sanitize(e.bounds[3])) * 0.5f;
             stroked.push_back({angle, cx, cy, length});
         }
     }
