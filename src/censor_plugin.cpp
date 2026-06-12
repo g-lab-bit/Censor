@@ -25,6 +25,8 @@
 
 #include <atomic>
 #include <cstring>
+#include <mutex>
+#include <shared_mutex>
 
 /* ---------------------------------------------------------------------------
  * Module state
@@ -33,6 +35,13 @@
  * per process.  censor_attach_engine / censor_detach_engine once per document.
  * -------------------------------------------------------------------------*/
 
+/* ce-8eo — g_host is read by censor_log/fire_fatal from ANY thread (the fatal
+ * path is documented thread-safe) while censor_init/censor_shutdown write it.
+ * Readers hold the shared lock ACROSS the callback invocation, so shutdown's
+ * unique-lock zeroing waits for in-flight callbacks to finish — no torn reads,
+ * no null function-pointer calls, no callback executing after shutdown returns.
+ * (Host callbacks must not re-enter Censor; the ABI doc already forbids it.) */
+static std::shared_mutex     g_host_mu;
 static RapidaHostCallbacks   g_host      = {};
 static RapidaVectorEngineHandle g_engine = nullptr;
 static std::atomic<bool>     g_initialized{false};
@@ -48,6 +57,7 @@ static std::atomic<bool>     g_poisoned{false};
 
 static void censor_log(int level, const char* message)
 {
+    std::shared_lock<std::shared_mutex> lk(g_host_mu);  /* ce-8eo */
     if (g_host.log) {
         g_host.log(g_host.user_data, level, "censor", message);
     }
@@ -76,14 +86,22 @@ static void fire_fatal(const char* reason)
     /* Notify the host.  Rapida's handler will:
      *   - Log CRITICAL
      *   - Set its own censor_poisoned flag
-     *   - Post the non-blocking UI banner */
-    if (g_host.on_censor_fatal) {
-        g_host.on_censor_fatal(g_host.user_data, reason);
+     *   - Post the non-blocking UI banner
+     * ce-8eo: shared lock held across the invocation so a concurrent
+     * censor_shutdown cannot zero g_host mid-call. */
+    {
+        std::shared_lock<std::shared_mutex> lk(g_host_mu);
+        if (g_host.on_censor_fatal) {
+            g_host.on_censor_fatal(g_host.user_data, reason);
+        }
+        /* Belt-and-suspenders: log at CRITICAL via the log sink so the event
+         * appears in Rapida's log file even if on_censor_fatal is a no-op stub.
+         * (Inline rather than censor_log() — shared_mutex re-acquisition on the
+         * same thread is not guaranteed safe while a writer waits.) */
+        if (g_host.log) {
+            g_host.log(g_host.user_data, 5 /* CRITICAL */, "censor", reason);
+        }
     }
-
-    /* Belt-and-suspenders: log at CRITICAL via the log sink so the event
-     * appears in Rapida's log file even if on_censor_fatal is a no-op stub. */
-    censor_log(5 /* CRITICAL */, reason);
 }
 
 /* ---------------------------------------------------------------------------
@@ -107,7 +125,10 @@ int32_t censor_init(const RapidaHostCallbacks* host)
         return 3; /* required callbacks missing */
     }
 
-    g_host        = *host;
+    {
+        std::unique_lock<std::shared_mutex> lk(g_host_mu);  /* ce-8eo */
+        g_host = *host;
+    }
     g_poisoned.store(false, std::memory_order_release);
     g_engine      = nullptr;
     g_initialized.store(true, std::memory_order_release);
@@ -122,8 +143,15 @@ void censor_shutdown(void)
         censor_log(2 /* INFO */, "Censor shutting down");
     }
     g_engine  = nullptr;
+    /* ce-8eo — zero the host BEFORE resetting the poison flag, under the
+     * unique lock (which waits for any in-flight callback holding the shared
+     * lock). A fire_fatal racing past this point snapshots an empty host and
+     * calls nothing; the poison reset below then safely re-arms for re-init. */
+    {
+        std::unique_lock<std::shared_mutex> lk(g_host_mu);
+        g_host = {};
+    }
     g_poisoned.store(false, std::memory_order_release);
-    g_host    = {};
 }
 
 int32_t censor_attach_engine(RapidaVectorEngineHandle engine)

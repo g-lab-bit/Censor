@@ -17,9 +17,15 @@ BackgroundWorker::~BackgroundWorker()
 
 void BackgroundWorker::start()
 {
-    if (running_.load()) return;
+    /* ce-654 — CAS gate: exactly one concurrent start() wins; the rest
+     * return. (Plain load-then-store let two starters both pass the guard
+     * and the second overwrite thread_, losing a joinable thread.) */
+    bool expected = false;
+    if (!running_.compare_exchange_strong(expected, true)) return;
+    /* Reap a previously self-exited worker (worker_loop clears running_ on
+     * exit but the thread object stays joinable until joined). */
+    if (thread_.joinable()) thread_.join();
     stop_requested_.store(false);
-    running_.store(true);
     thread_ = std::thread(&BackgroundWorker::worker_loop, this);
 }
 

@@ -21,8 +21,17 @@ static std::string now_iso8601()
 {
     auto now = std::chrono::system_clock::now();
     auto t   = std::chrono::system_clock::to_time_t(now);
+    /* ce-3hj — std::gmtime returns a shared static buffer (a data race when
+     * two CensorDb instances run on different threads; also a C4996 hard
+     * error under MSVC /WX). Use the per-caller-buffer variants. */
+    std::tm tm_buf{};
+#if defined(_MSC_VER)
+    gmtime_s(&tm_buf, &t);
+#else
+    gmtime_r(&t, &tm_buf);
+#endif
     std::ostringstream ss;
-    ss << std::put_time(std::gmtime(&t), "%Y-%m-%dT%H:%M:%SZ");
+    ss << std::put_time(&tm_buf, "%Y-%m-%dT%H:%M:%SZ");
     return ss.str();
 }
 

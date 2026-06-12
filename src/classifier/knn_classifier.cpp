@@ -38,6 +38,7 @@ void KNNClassifier::add_example(const FeatureVector& features,
                                 const std::string&   label,
                                 bool                 is_negative)
 {
+    std::unique_lock<std::shared_mutex> lk(mu_);  /* Censor-owf */
     examples_.push_back({features, label, is_negative});
 }
 
@@ -48,6 +49,7 @@ void KNNClassifier::add_example(const FeatureVector& features,
  * -------------------------------------------------------------------------*/
 std::map<std::string, int> KNNClassifier::label_counts() const
 {
+    std::shared_lock<std::shared_mutex> lk(mu_);  /* Censor-owf */
     std::map<std::string, int> counts;
     for (const auto& ex : examples_) {
         counts[ex.label]++;
@@ -69,6 +71,7 @@ std::map<std::string, int> KNNClassifier::label_counts() const
  * -------------------------------------------------------------------------*/
 ClassifyResult KNNClassifier::predict(const FeatureVector& features) const
 {
+    std::shared_lock<std::shared_mutex> lk(mu_);  /* Censor-owf */
     ClassifyResult result;
 
     /* Collect (similarity, label) for positive examples only. */

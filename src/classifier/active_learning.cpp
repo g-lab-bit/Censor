@@ -19,8 +19,11 @@ namespace censor {
 
 static std::string generate_uuid()
 {
-    static std::mt19937                      rng{std::random_device{}()};
-    static std::uniform_int_distribution<uint32_t> dist;
+    /* ce-kt5 — thread_local: the statics were shared mutable state racing
+     * between BackgroundWorker reads and UI-thread store_suggestions calls.
+     * Per-thread RNGs are independently seeded from std::random_device. */
+    thread_local std::mt19937                      rng{std::random_device{}()};
+    thread_local std::uniform_int_distribution<uint32_t> dist;
 
     std::ostringstream ss;
     ss << std::hex << std::setfill('0');
