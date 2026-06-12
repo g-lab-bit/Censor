@@ -16,3 +16,7 @@ __pycache__/
 state.json
 CLAUDE.md
 CLAUDE.local.md
+
+# Bead lock files + audit log (runtime state)
+.beads/locks/
+.beads/audit.log
