@@ -95,12 +95,10 @@ typedef void* RapidaVectorEngineHandle;
 #endif
 
 /* ---------------------------------------------------------------------------
- * Exported entry points
- *
- * NOTE: The spec describes "six total exported symbols" (SPEC-censor-integration.md
- * §"C ABI surface").  The current spec text explicitly defines five.  This header
- * implements the five that are spec-defined.  A sixth will be added and the ABI
- * version bumped when the spec is updated.
+ * Exported entry points — five total, matching SPEC-censor-integration.md
+ * §"C ABI surface" (the spec's stray "six" wordings were a miscount, corrected
+ * 2026-06-12 under ra-qojmv). Any future additions bump the ABI version per the
+ * add-never-remove-never-reorder discipline.
  * -------------------------------------------------------------------------*/
 
 /* Returns CENSOR_ABI_VERSION.
