@@ -2,8 +2,8 @@
  * knn_classifier.h — k-NN classifier with cosine similarity (SPEC-censor-core §6).
  */
 
-#ifndef CENSOR_KNN_CLASSIFIER_H
-#define CENSOR_KNN_CLASSIFIER_H
+#pragma once
+
 
 
 #include "censor_visibility.h"
@@ -58,4 +58,3 @@ private:
 
 } /* namespace censor */
 
-#endif /* CENSOR_KNN_CLASSIFIER_H */

@@ -6,8 +6,8 @@
  * and therefore the most interesting to label next.
  */
 
-#ifndef CENSOR_DISCOVERY_QUEUE_H
-#define CENSOR_DISCOVERY_QUEUE_H
+#pragma once
+
 
 
 #include "censor_visibility.h"
@@ -82,4 +82,3 @@ private:
 
 } /* namespace censor */
 
-#endif /* CENSOR_DISCOVERY_QUEUE_H */

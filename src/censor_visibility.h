@@ -19,8 +19,8 @@
  * separate CENSOR_EXPORT macro in include/censor_abi.h.
  */
 
-#ifndef CENSOR_VISIBILITY_H
-#define CENSOR_VISIBILITY_H
+#pragma once
+
 
 #if defined(_MSC_VER)
 #  if defined(CENSOR_BUILD_DLL)
@@ -33,5 +33,3 @@
 #else
 #  define CENSOR_API __attribute__((visibility("default")))
 #endif
-
-#endif /* CENSOR_VISIBILITY_H */

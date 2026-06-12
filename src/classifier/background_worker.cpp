@@ -5,10 +5,10 @@
 
 namespace censor {
 
-BackgroundWorker::BackgroundWorker(std::shared_ptr<IClassifier> classifier,
-                                   ConfidenceOverlay& overlay,
+BackgroundWorker::BackgroundWorker(std::shared_ptr<IClassifier>    classifier,
+                                   std::shared_ptr<ConfidenceOverlay> overlay,
                                    DebugVizData* debug_viz)
-    : classifier_(std::move(classifier)), overlay_(overlay), debug_viz_(debug_viz)
+    : classifier_(std::move(classifier)), overlay_(std::move(overlay)), debug_viz_(debug_viz)
 {}
 
 BackgroundWorker::~BackgroundWorker()
@@ -85,7 +85,7 @@ void BackgroundWorker::worker_loop()
             result = classifier_->predict(c.features);
         }
 
-        overlay_.update(c.cluster_id, c.bounds, result);
+        overlay_->update(c.cluster_id, c.bounds, result);
         } catch (const std::exception&) { /* swallow — loop must survive */ }
         catch (...) { /* swallow — loop must survive */ }
     }

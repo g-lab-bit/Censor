@@ -141,7 +141,11 @@ TEST_F(ALTest, ConfirmAddPositiveExample) {
 }
 
 /* ---------------------------------------------------------------------------
- * Test 5: reject() with no corrected label adds a negative example.
+ * Test 5: reject() with no corrected label adds a negative example and
+ * returns true; the negative is stored but does NOT appear in label_counts()
+ * (which tracks positive examples only — ce-o03).  We verify by confirming
+ * reject() succeeds and that a subsequent positive add still increments the
+ * count by exactly 1.
  * -------------------------------------------------------------------------*/
 TEST_F(ALTest, RejectAddNegativeExample) {
     ActiveLearner al{db, clf};
@@ -152,13 +156,20 @@ TEST_F(ALTest, RejectAddNegativeExample) {
     ASSERT_EQ(suggestions.size(), 1u);
     al.store_suggestions(suggestions);
 
+    /* reject() stores a NEGATIVE example — label_counts() counts positives only */
     int before = clf.label_counts()["pipe"];
     ASSERT_TRUE(al.reject(suggestions[0].suggestion_id, fv, "pipe"));
+    /* label_counts() unchanged because the stored example is negative */
+    EXPECT_EQ(clf.label_counts()["pipe"], before);
+    /* A positive add after the reject increments by 1 as expected */
+    clf.add_example(fv, "pipe", /*is_negative=*/false);
     EXPECT_EQ(clf.label_counts()["pipe"], before + 1);
 }
 
 /* ---------------------------------------------------------------------------
- * Test 6: reject() with corrected label adds both negative and positive.
+ * Test 6: reject() with corrected label adds a negative for predicted_label
+ * and a positive for corrected_label.  label_counts() (positives only — ce-o03)
+ * must show: pipe unchanged (negative added), duct +1 (positive added).
  * -------------------------------------------------------------------------*/
 TEST_F(ALTest, ReclassifyAddsBothNegAndPos) {
     ActiveLearner al{db, clf};
@@ -174,8 +185,10 @@ TEST_F(ALTest, ReclassifyAddsBothNegAndPos) {
 
     ASSERT_TRUE(al.reject(suggestions[0].suggestion_id, fv, "pipe", "duct"));
 
-    EXPECT_EQ(clf.label_counts()["pipe"], before_pipe + 1); /* negative */
-    EXPECT_EQ(clf.label_counts()["duct"], before_duct + 1); /* positive */
+    /* "pipe" got a NEGATIVE example — does NOT appear in label_counts() */
+    EXPECT_EQ(clf.label_counts()["pipe"], before_pipe);
+    /* "duct" got a POSITIVE example — appears in label_counts() */
+    EXPECT_EQ(clf.label_counts()["duct"], before_duct + 1);
 }
 
 /* ---------------------------------------------------------------------------

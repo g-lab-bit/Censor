@@ -108,7 +108,7 @@ classification problem entirely — cleaner feature space for everything else.
 | 4 | Stroke weight band | int | Which band from §2 calibration |
 | 5 | Closed loop count | int | Number of closed subpaths |
 | 6 | Closed loop total area | float | Sum of shoelace areas of closed loops |
-| 7 | Connectivity to adjacent cells | int | How many neighboring cells contain part of this cluster |
+| 7 | Connectivity to adjacent cells | int | How many neighboring cells contain part of this cluster (deferred — ce-1eo; always 0.0f until GridSystem wiring lands) |
 | 8 | Fill presence | bool→float | 1.0 if any fill element in cluster, 0.0 otherwise |
 | 9 | Aspect ratio | float | Bounding box width / height |
 | 10 | Bounding box area | float | Width × height of cluster bounds |

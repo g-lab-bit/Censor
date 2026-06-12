@@ -1,5 +1,5 @@
-#ifndef CENSOR_DEBUG_VIZ_DATA_H
-#define CENSOR_DEBUG_VIZ_DATA_H
+#pragma once
+
 
 #include "censor_types.h"
 
@@ -33,9 +33,9 @@ struct FeatureOverlayData {
  * HistogramBin — one bucket from the stroke weight histogram.
  * -------------------------------------------------------------------------*/
 struct HistogramBin {
-    float low;   /* inclusive lower bound (pts) */
-    float high;  /* exclusive upper bound (pts) */
-    int   count; /* number of stroke widths in [low, high) */
+    float low   = 0.0f; /* inclusive lower bound (pts) */
+    float high  = 0.0f; /* exclusive upper bound (pts) */
+    int   count = 0;    /* number of stroke widths in [low, high) */
 };
 
 /* ---------------------------------------------------------------------------
@@ -51,8 +51,8 @@ struct HistogramData {
  * ClusterBoundsEntry — one cluster bounding rect for API 3.
  * -------------------------------------------------------------------------*/
 struct ClusterBoundsEntry {
-    int   cluster_id;
-    float bounds[4]; /* x0, y0, x1, y1 */
+    int   cluster_id = 0;
+    float bounds[4]  = {}; /* x0, y0, x1, y1 */
 };
 
 /* ---------------------------------------------------------------------------
@@ -129,4 +129,3 @@ private:
 
 } /* namespace censor */
 
-#endif /* CENSOR_DEBUG_VIZ_DATA_H */

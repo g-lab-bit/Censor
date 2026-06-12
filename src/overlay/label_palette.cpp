@@ -161,16 +161,30 @@ void LabelPalette::record_label(const std::string& label)
     if (e) ++e->count;
 }
 
-int LabelPalette::label_count(const std::string& label) const
+/* --------------------------------------------------------------------------
+ * _locked helpers (caller holds mu_)
+ * ce-7lx: private _locked variants prevent seeding_hint → seeding_complete
+ * → label_count lock-re-acquisition if they are ever called on the same path.
+ * Public wrappers lock once and delegate.
+ * -------------------------------------------------------------------------*/
+
+int LabelPalette::label_count_locked(const std::string& label) const
 {
-    std::lock_guard<std::mutex> lk(mu_);
+    /* mu_ must be held by caller */
     const LabelEntry* e = entry_for_label(label);
     return e ? e->count : 0;
 }
 
+int LabelPalette::label_count(const std::string& label) const
+{
+    std::lock_guard<std::mutex> lk(mu_);
+    return label_count_locked(label);
+}
+
 bool LabelPalette::seeding_complete(const std::string& label) const
 {
-    return label_count(label) >= SEEDING_THRESHOLD_PER_CLASS;
+    std::lock_guard<std::mutex> lk(mu_);
+    return label_count_locked(label) >= SEEDING_THRESHOLD_PER_CLASS;
 }
 
 std::string LabelPalette::seeding_hint(const std::string& label) const
@@ -178,7 +192,8 @@ std::string LabelPalette::seeding_hint(const std::string& label) const
     if (label == "Skip") return {};
     std::lock_guard<std::mutex> lk(mu_);
     const LabelEntry* e = entry_for_label(label);
-    if (!e || e->count >= SEEDING_THRESHOLD_PER_CLASS) return {};
+    if (!e) return {};                                       /* unknown label */
+    if (e->count >= SEEDING_THRESHOLD_PER_CLASS) return {};
     int remaining = SEEDING_THRESHOLD_PER_CLASS - e->count;
     return "Need " + std::to_string(remaining) + " more " + label +
            (remaining == 1 ? " label" : " labels") + " before predictions activate.";

@@ -5,8 +5,8 @@
  * interface. Callers hold IClassifier* and never depend on the concrete type.
  */
 
-#ifndef CENSOR_ICLASSIFIER_H
-#define CENSOR_ICLASSIFIER_H
+#pragma once
+
 
 #include "censor_types.h"
 
@@ -37,4 +37,3 @@ public:
 
 } /* namespace censor */
 
-#endif /* CENSOR_ICLASSIFIER_H */

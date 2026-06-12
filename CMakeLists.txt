@@ -47,6 +47,10 @@ endif()
 add_library(sqlite3_obj OBJECT third_party/sqlite/sqlite3.c)
 target_include_directories(sqlite3_obj PUBLIC third_party/sqlite)
 set_target_properties(sqlite3_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_definitions(sqlite3_obj PRIVATE
+    SQLITE_API=
+    SQLITE_OMIT_LOAD_EXTENSION=1
+)
 if(MSVC)
     # Third-party amalgamation is not /W4-clean; don't let /WX block the build.
     target_compile_options(sqlite3_obj PRIVATE /w /WX-)
@@ -74,7 +78,8 @@ set_target_properties(censor PROPERTIES
 )
 
 # ce-hcy: CENSOR_API resolves to dllexport while building the DLL on MSVC.
-target_compile_definitions(censor PRIVATE CENSOR_BUILD_DLL)
+# ce-882: match SQLITE_API= so censor_db.cpp declarations agree with sqlite3_obj.
+target_compile_definitions(censor PRIVATE CENSOR_BUILD_DLL SQLITE_API=)
 
 # ---------------------------------------------------------------------------
 # Tests
@@ -182,7 +187,7 @@ if(CENSOR_BUILD_TESTS)
     )
     gtest_discover_tests(test_grid)
 
-    foreach(module storage classifier label_palette)
+    foreach(module storage classifier label_palette active_learning)
         add_executable(test_${module}
             tests/test_${module}.cpp
         )

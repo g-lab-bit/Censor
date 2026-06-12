@@ -8,8 +8,8 @@
  *   4. confirm() / reject() → update DB + feed classifier
  */
 
-#ifndef CENSOR_ACTIVE_LEARNING_H
-#define CENSOR_ACTIVE_LEARNING_H
+#pragma once
+
 
 
 #include "censor_visibility.h"
@@ -76,4 +76,3 @@ private:
 
 } /* namespace censor */
 
-#endif /* CENSOR_ACTIVE_LEARNING_H */

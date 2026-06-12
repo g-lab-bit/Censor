@@ -1,5 +1,5 @@
-#ifndef CENSOR_CONFIDENCE_OVERLAY_H
-#define CENSOR_CONFIDENCE_OVERLAY_H
+#pragma once
+
 
 
 #include "censor_visibility.h"
@@ -84,4 +84,3 @@ private:
 
 } /* namespace censor */
 
-#endif /* CENSOR_CONFIDENCE_OVERLAY_H */

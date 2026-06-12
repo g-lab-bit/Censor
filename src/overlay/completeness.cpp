@@ -51,6 +51,12 @@ void CompletenessHUD::record_label_event()
 {
     std::lock_guard<std::mutex> lk(mu_);
     label_times_.push_back(Clock::now());
+    /* ce-ivd: prune entries older than 60 s to bound vector growth.
+     * labeling_rate() uses the same 60 s window, so stale entries are dead weight. */
+    using namespace std::chrono;
+    auto cutoff = Clock::now() - seconds(60);
+    auto it = std::lower_bound(label_times_.begin(), label_times_.end(), cutoff);
+    label_times_.erase(label_times_.begin(), it);
 }
 
 float CompletenessHUD::labeling_rate() const

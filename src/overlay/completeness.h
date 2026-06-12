@@ -5,8 +5,8 @@
  * predicts it above CLASSIFIER_CONFIDENCE_THRESHOLD.
  */
 
-#ifndef CENSOR_COMPLETENESS_H
-#define CENSOR_COMPLETENESS_H
+#pragma once
+
 
 
 #include "censor_visibility.h"
@@ -83,4 +83,3 @@ private:
 
 } /* namespace censor */
 
-#endif /* CENSOR_COMPLETENESS_H */

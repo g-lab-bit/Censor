@@ -86,6 +86,9 @@ bool DebugVizData::is_debug_enabled() const noexcept
 
 void DebugVizData::register_cluster(const Cluster& cluster)
 {
+    /* ce-vii: skip storage when debug overlay is disabled to avoid unbounded
+     * growth of element_indices vectors across multi-page sessions. */
+    if (!debug_enabled_.load()) return;
     std::lock_guard<std::mutex> lock(mu_);
     clusters_[cluster.cluster_id] = cluster;
 }

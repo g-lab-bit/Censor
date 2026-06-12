@@ -33,7 +33,8 @@ static constexpr float FV_PARALLEL_MIN_LENGTH  = 10.0f;  /* minimum element leng
  *                  tests that don't exercise band detection
  *
  * Returns a FeatureVector with all dims filled.  Dims 6 (ADJACENT_CONNECTIVITY)
- * is always 0 here — requires grid context from the caller.
+ * is always 0.0f — grid-context wiring is deferred (ce-1eo); see also
+ * FeatureDim::ADJACENT_CONNECTIVITY in censor_types.h and SPEC-censor-core §4.
  * -------------------------------------------------------------------------*/
 CENSOR_API FeatureVector compute_features(
     const Cluster&                  cluster,

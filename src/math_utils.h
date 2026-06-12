@@ -5,8 +5,8 @@
  * No .cpp counterpart — all definitions are inline.
  */
 
-#ifndef CENSOR_MATH_UTILS_H
-#define CENSOR_MATH_UTILS_H
+#pragma once
+
 
 #include "censor_types.h"
 
@@ -56,4 +56,3 @@ inline float cosine_similarity(const FeatureVector& a, const FeatureVector& b)
 
 } /* namespace censor */
 
-#endif /* CENSOR_MATH_UTILS_H */

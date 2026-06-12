@@ -8,8 +8,8 @@
  * Thread-safe: all methods are safe from any thread.
  */
 
-#ifndef CENSOR_REJECTION_TOAST_H
-#define CENSOR_REJECTION_TOAST_H
+#pragma once
+
 
 
 #include "censor_visibility.h"
@@ -52,4 +52,3 @@ private:
 
 } /* namespace censor */
 
-#endif /* CENSOR_REJECTION_TOAST_H */

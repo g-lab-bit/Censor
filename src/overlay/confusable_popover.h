@@ -8,8 +8,8 @@
  * Thread-safe: all methods are safe from any thread.
  */
 
-#ifndef CENSOR_CONFUSABLE_POPOVER_H
-#define CENSOR_CONFUSABLE_POPOVER_H
+#pragma once
+
 
 
 #include "censor_visibility.h"
@@ -88,4 +88,3 @@ private:
 
 } /* namespace censor */
 
-#endif /* CENSOR_CONFUSABLE_POPOVER_H */

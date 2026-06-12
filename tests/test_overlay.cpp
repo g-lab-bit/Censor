@@ -354,7 +354,7 @@ private:
 
 TEST(BackgroundWorker, ClassifiesAndUpdatesOverlay)
 {
-    ConfidenceOverlay ov;
+    auto ov  = std::make_shared<ConfidenceOverlay>();
     auto clf = std::make_shared<StubClassifier>("wall", 0.9f);
     BackgroundWorker worker(clf, ov);
 
@@ -366,7 +366,7 @@ TEST(BackgroundWorker, ClassifiesAndUpdatesOverlay)
     worker.submit(c);
     worker.stop();
 
-    auto snap = ov.snapshot();
+    auto snap = ov->snapshot();
     ASSERT_EQ(snap.size(), 1u);
     EXPECT_EQ(snap[0].cluster_id, 1);
     EXPECT_EQ(snap[0].label, "wall");
@@ -375,7 +375,7 @@ TEST(BackgroundWorker, ClassifiesAndUpdatesOverlay)
 
 TEST(BackgroundWorker, MultipleJobsAllProcessed)
 {
-    ConfidenceOverlay ov;
+    auto ov  = std::make_shared<ConfidenceOverlay>();
     auto clf = std::make_shared<StubClassifier>("duct", 0.8f);
     BackgroundWorker worker(clf, ov);
 
@@ -389,12 +389,12 @@ TEST(BackgroundWorker, MultipleJobsAllProcessed)
     }
     worker.stop();
 
-    EXPECT_EQ(ov.snapshot().size(), 5u);
+    EXPECT_EQ(ov->snapshot().size(), 5u);
 }
 
 TEST(BackgroundWorker, StopDrainsQueueBeforeExit)
 {
-    ConfidenceOverlay ov;
+    auto ov  = std::make_shared<ConfidenceOverlay>();
     auto clf = std::make_shared<StubClassifier>("pipe", 0.7f);
     BackgroundWorker worker(clf, ov);
 
@@ -410,7 +410,7 @@ TEST(BackgroundWorker, StopDrainsQueueBeforeExit)
 
     /* All 10 clusters should have been processed (last write wins per id,
      * but all 10 unique ids → 10 entries since each id is unique). */
-    EXPECT_EQ(ov.snapshot().size(), 10u);
+    EXPECT_EQ(ov->snapshot().size(), 10u);
     EXPECT_FALSE(worker.is_running());
 }
 
@@ -429,6 +429,7 @@ TEST(DebugVizData, FeatureOverlay_NotFound)
 TEST(DebugVizData, FeatureOverlay_ReturnsAllTwelveDims)
 {
     DebugVizData dvd;
+    dvd.set_debug_enabled(true); /* register_cluster is a no-op when debug off (ce-vii) */
     FeatureVector fv{};
     for (int i = 0; i < FEATURE_DIM_COUNT; ++i)
         fv.dims[i] = static_cast<float>(i + 1);
@@ -449,6 +450,7 @@ TEST(DebugVizData, FeatureOverlay_ReturnsAllTwelveDims)
 TEST(DebugVizData, FeatureOverlay_ClearRemovesClusters)
 {
     DebugVizData dvd;
+    dvd.set_debug_enabled(true); /* register_cluster is a no-op when debug off (ce-vii) */
     dvd.register_cluster(make_cluster(1, fv_unit(0)));
     dvd.clear();
     EXPECT_FALSE(dvd.get_feature_overlay(1).found);
@@ -501,6 +503,7 @@ TEST(DebugVizData, ClusterBounds_EmptyRegistry)
 TEST(DebugVizData, ClusterBounds_FullViewport_ReturnsAll)
 {
     DebugVizData dvd;
+    dvd.set_debug_enabled(true); /* register_cluster is a no-op when debug off (ce-vii) */
     dvd.register_cluster(make_cluster(1, fv_unit(0),  0,  0, 10, 10));
     dvd.register_cluster(make_cluster(2, fv_unit(0), 20, 20, 30, 30));
     dvd.register_cluster(make_cluster(3, fv_unit(0), 50, 50, 60, 60));
@@ -512,6 +515,7 @@ TEST(DebugVizData, ClusterBounds_FullViewport_ReturnsAll)
 TEST(DebugVizData, ClusterBounds_ViewportFiltersCorrectly)
 {
     DebugVizData dvd;
+    dvd.set_debug_enabled(true); /* register_cluster is a no-op when debug off (ce-vii) */
     /* Cluster 1 fully inside [0,0,15,15]; cluster 2 outside. */
     dvd.register_cluster(make_cluster(1, fv_unit(0),  0,  0, 10, 10));
     dvd.register_cluster(make_cluster(2, fv_unit(0), 20, 20, 30, 30));
@@ -526,6 +530,7 @@ TEST(DebugVizData, ClusterBounds_ViewportFiltersCorrectly)
 TEST(DebugVizData, ClusterBounds_OverlapEdge_Included)
 {
     DebugVizData dvd;
+    dvd.set_debug_enabled(true); /* register_cluster is a no-op when debug off (ce-vii) */
     /* Cluster straddles the right edge of the viewport — should be included. */
     dvd.register_cluster(make_cluster(7, fv_unit(0), 8, 0, 12, 5));
     auto result = dvd.get_cluster_bounds(0, 0, 10, 10);
@@ -605,7 +610,7 @@ TEST(DebugVizData, InferenceTiming_ClearRemovesAll)
 
 TEST(BackgroundWorker, RecordsTimingWhenDebugEnabled)
 {
-    ConfidenceOverlay ov;
+    auto ov = std::make_shared<ConfidenceOverlay>();
     DebugVizData dvd;
     dvd.set_debug_enabled(true);
 
@@ -628,7 +633,7 @@ TEST(BackgroundWorker, RecordsTimingWhenDebugEnabled)
 
 TEST(BackgroundWorker, NoTimingWhenDebugDisabled)
 {
-    ConfidenceOverlay ov;
+    auto ov = std::make_shared<ConfidenceOverlay>();
     DebugVizData dvd;
     /* debug disabled by default */
 
@@ -649,7 +654,7 @@ TEST(BackgroundWorker, NoTimingWhenDebugDisabled)
 TEST(BackgroundWorker, NoTimingWhenNoDebugViz)
 {
     /* Existing usage without DebugVizData should still work correctly. */
-    ConfidenceOverlay ov;
+    auto ov  = std::make_shared<ConfidenceOverlay>();
     auto clf = std::make_shared<StubClassifier>("duct", 0.8f);
     BackgroundWorker worker(clf, ov); /* no debug_viz */
 
@@ -661,7 +666,7 @@ TEST(BackgroundWorker, NoTimingWhenNoDebugViz)
     worker.submit(c);
     worker.stop();
 
-    EXPECT_EQ(ov.snapshot().size(), 1u);
+    EXPECT_EQ(ov->snapshot().size(), 1u);
 }
 
 /* ========================================================================== */

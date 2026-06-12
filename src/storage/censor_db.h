@@ -12,8 +12,8 @@
  * Not thread-safe. Caller must serialise access.
  */
 
-#ifndef CENSOR_DB_H
-#define CENSOR_DB_H
+#pragma once
+
 
 
 #include "censor_visibility.h"
@@ -130,4 +130,3 @@ CENSOR_API int hydrate_classifier(const CensorDb& db, IClassifier& clf);
 
 } /* namespace censor */
 
-#endif /* CENSOR_DB_H */

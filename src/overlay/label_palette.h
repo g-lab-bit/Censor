@@ -8,8 +8,8 @@
  * Thread-safe: all methods are safe from any thread.
  */
 
-#ifndef CENSOR_LABEL_PALETTE_H
-#define CENSOR_LABEL_PALETTE_H
+#pragma once
+
 
 
 #include "censor_visibility.h"
@@ -143,6 +143,11 @@ private:
     LabelEntry*       entry_for_label(const std::string& label);
     const LabelEntry* entry_for_label(const std::string& label) const;
 
+    /* _locked variants: caller MUST hold mu_.
+     * Convention: any method that needs label_count while already holding mu_
+     * calls label_count_locked() to avoid recursive lock acquisition. */
+    int label_count_locked(const std::string& label) const;
+
     mutable std::mutex      mu_;
     std::vector<LabelEntry> entries_;
     int                     active_slot_      = 0;
@@ -153,4 +158,3 @@ private:
 
 } /* namespace censor */
 
-#endif /* CENSOR_LABEL_PALETTE_H */

@@ -9,8 +9,8 @@
  * mirrors the C ABI shim types in SPEC-censor-integration.md.
  */
 
-#ifndef CENSOR_TYPES_H
-#define CENSOR_TYPES_H
+#pragma once
+
 
 #include <cstdint>
 #include <string>
@@ -46,6 +46,7 @@ enum FeatureDim : int {
     CLOSED_LOOP_COUNT     = 4,  /* number of closed subpaths */
     CLOSED_LOOP_AREA      = 5,  /* sum of shoelace areas of closed loops */
     ADJACENT_CONNECTIVITY = 6,  /* neighboring cells containing this cluster */
+                                 /* NOTE: always 0.0f — grid-context wiring deferred (ce-1eo) */
     FILL_PRESENCE         = 7,  /* 1.0 if any fill element, 0.0 otherwise */
     ASPECT_RATIO          = 8,  /* bounds width / height */
     BBOX_AREA             = 9,  /* bounds width × height */
@@ -109,4 +110,3 @@ struct CensorOverlayEntry {
 
 } /* namespace censor */
 
-#endif /* CENSOR_TYPES_H */

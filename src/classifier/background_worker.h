@@ -1,5 +1,5 @@
-#ifndef CENSOR_BACKGROUND_WORKER_H
-#define CENSOR_BACKGROUND_WORKER_H
+#pragma once
+
 
 
 #include "censor_visibility.h"
@@ -27,13 +27,20 @@ namespace censor {
  *
  * Lifecycle: start() → submit(…) × N → stop().
  * stop() drains the pending queue before the thread exits.
+ *
+ * Ownership:
+ *   overlay_  — shared_ptr; worker keeps the overlay alive for its lifetime.
+ *   debug_viz — raw pointer; MUST outlive the worker, or be null.
+ *               stop() MUST be called (or dtor complete) before debug_viz dies.
  * -------------------------------------------------------------------------*/
 class CENSOR_API BackgroundWorker {
 public:
     /* debug_viz: optional pointer to DebugVizData for inference timing.
-     * Timing is recorded only when debug_viz is non-null and debug mode enabled. */
-    BackgroundWorker(std::shared_ptr<IClassifier> classifier,
-                     ConfidenceOverlay& overlay,
+     * Timing is recorded only when debug_viz is non-null and debug mode enabled.
+     * IMPORTANT: debug_viz must outlive the worker (or be null); call stop()
+     * before destroying debug_viz to guarantee the worker thread has exited. */
+    BackgroundWorker(std::shared_ptr<IClassifier>    classifier,
+                     std::shared_ptr<ConfidenceOverlay> overlay,
                      DebugVizData* debug_viz = nullptr);
     ~BackgroundWorker();
 
@@ -53,9 +60,9 @@ private:
 
     void worker_loop();
 
-    std::shared_ptr<IClassifier> classifier_;
-    ConfidenceOverlay&           overlay_;
-    DebugVizData*                debug_viz_;
+    std::shared_ptr<IClassifier>    classifier_;
+    std::shared_ptr<ConfidenceOverlay> overlay_;
+    DebugVizData*                    debug_viz_;
 
     std::thread             thread_;
     std::atomic<bool>       running_{false};
@@ -68,4 +75,3 @@ private:
 
 } /* namespace censor */
 
-#endif /* CENSOR_BACKGROUND_WORKER_H */
