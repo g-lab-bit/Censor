@@ -82,6 +82,25 @@ set_target_properties(censor PROPERTIES
 target_compile_definitions(censor PRIVATE CENSOR_BUILD_DLL SQLITE_API=)
 
 # ---------------------------------------------------------------------------
+# ra-vbj53 — Rapida public C ABI headers (rapida_vector_engine_c.h,
+# rapida_host_callbacks.h). Censor consumes them when the real pipeline lands
+# (Censor-x7d); per SPEC-censor-integration §Shim header location, Censor never
+# includes anything from Rapida's src/. The checkout path is machine-specific
+# (Windows: C:/Users/gdilo/Rapida, linux: ~/gt/Rapida), so it is supplied via
+# -DRAPIDA_PUBLIC_INCLUDE=<path> or the RAPIDA_PUBLIC_INCLUDE env var.
+# OPTIONAL: when absent, Censor still builds fully standalone.
+# ---------------------------------------------------------------------------
+set(RAPIDA_PUBLIC_INCLUDE "$ENV{RAPIDA_PUBLIC_INCLUDE}" CACHE PATH
+    "Path to Rapida's libs/rapida/include/public directory (C ABI shim headers)")
+if(RAPIDA_PUBLIC_INCLUDE AND EXISTS "${RAPIDA_PUBLIC_INCLUDE}/rapida_vector_engine_c.h")
+    target_include_directories(censor PRIVATE "${RAPIDA_PUBLIC_INCLUDE}")
+    target_compile_definitions(censor PRIVATE CENSOR_HAVE_RAPIDA_SHIM=1)
+    message(STATUS "Censor: Rapida shim headers found at ${RAPIDA_PUBLIC_INCLUDE}")
+else()
+    message(STATUS "Censor: RAPIDA_PUBLIC_INCLUDE not set or headers absent — standalone build (ra-vbj53)")
+endif()
+
+# ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
 option(CENSOR_BUILD_TESTS "Build Censor unit tests" ON)
