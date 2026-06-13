@@ -27,8 +27,14 @@ extern "C" {
 /* ABI version packed as (major << 16) | (minor << 8) | patch.
  * Rapida's loader accepts any DLL whose major version matches its own.
  * Minor/patch differences are tolerated under the "add, never remove, never
- * reorder" discipline.  Initial version: 1.0.0. */
-#define CENSOR_ABI_VERSION ((uint32_t)0x00010000u)
+ * reorder" discipline.
+ * v1.0.0 = 0x00010000 — initial stub
+ * v1.1.0 = 0x00010100 — Censor-x7d: real pipeline + RapidaHostCallbacks v2 */
+#define CENSOR_ABI_VERSION ((uint32_t)0x00010100u)
+
+/* Error codes returned by the v1.1 interactive ABI functions. */
+#define CENSOR_ERR_NOT_ATTACHED (-1)
+#define CENSOR_ERR_BAD_ARG      (-2)
 
 /* ---------------------------------------------------------------------------
  * Host callback table
@@ -38,7 +44,12 @@ extern "C" {
  * The pointer and all function pointers inside must remain valid until
  * censor_shutdown() returns.
  *
- * struct_version must equal 1 for ABI v1.x. */
+ * struct_version == 1: ABI v1.0 (log + on_censor_fatal + user_data only).
+ * struct_version == 2: ABI v1.1 — three fields appended after user_data
+ *   (invalidate_overlay, show_toast, vector_engine_api).  Censor reads
+ *   those only when struct_version >= 2 AND the pointer is non-NULL.
+ *
+ * Ordering is append-only — never reorder or remove fields. */
 typedef struct RapidaHostCallbacks {
     uint32_t struct_version;
 
@@ -71,6 +82,24 @@ typedef struct RapidaHostCallbacks {
     /* Opaque pointer passed unchanged to log() and on_censor_fatal().
      * Rapida uses it to carry its logger instance through the C boundary. */
     void* user_data;
+
+    /* --- ABI v1.1 fields (struct_version >= 2) — appended, never reordered -- */
+
+    /* Async classification changed page N's overlay.  Host should re-pull via
+     * censor_get_overlay on its render thread.  Called from a worker thread;
+     * the host implementation must be thread-safe and MUST NOT re-enter Censor
+     * synchronously.  May be NULL even in a v2 struct (host opts out). */
+    void (*invalidate_overlay)(void* user_data, int32_t page);
+
+    /* Non-blocking user toast (e.g. "Need 7 more Wall labels").
+     * May be NULL. */
+    void (*show_toast)(void* user_data, const char* message);
+
+    /* Engine read API as a function-pointer table — how Censor reads vector
+     * data across the binary boundary without importing host symbols.
+     * NULL until the host supplies it; the pipeline (Censor-x7d) is a no-op
+     * while NULL.  See rapida_vector_engine_c.h for the table definition. */
+    const struct RapidaVectorEngineApi* vector_engine_api;
 } RapidaHostCallbacks;
 
 /* ---------------------------------------------------------------------------
@@ -81,6 +110,16 @@ typedef struct RapidaHostCallbacks {
  * Censor must treat this as completely opaque — all interaction goes through
  * the rapida_vector_engine_c.h shim functions.  Never cast to a C++ type. */
 typedef void* RapidaVectorEngineHandle;
+
+/* ---------------------------------------------------------------------------
+ * RapidaVectorEngineApi forward declaration
+ *
+ * The full table definition lives in rapida_vector_engine_c.h (Rapida's
+ * public C ABI header).  Censor-x7d includes that header where the pipeline
+ * lives, guarded by CENSOR_HAVE_RAPIDA_SHIM.  Here we only need the type for
+ * the RapidaHostCallbacks v2 struct field.
+ * -------------------------------------------------------------------------*/
+struct RapidaVectorEngineApi;
 
 /* ---------------------------------------------------------------------------
  * Symbol visibility

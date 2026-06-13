@@ -149,9 +149,10 @@ TEST(SmokeDlopen, LoadAndExerciseAllExports)
     int32_t rc = fn_init(&cb);
     EXPECT_EQ(rc, 0) << "censor_init returned error " << rc;
 
-    /* censor_attach_engine — Phase 3 stub fires on_censor_fatal here.
-     * Return value must still be 0: the fatal is signalled via callback,
-     * not via return code. */
+    /* censor_attach_engine — v1.1 real pipeline: no fatal on a clean attach.
+     * Pass a non-null fake handle; the pipeline is a no-op because the host
+     * callback struct is v1 (no vector_engine_api field).
+     * Return value must be 0. */
     void* fake_engine = reinterpret_cast<void*>(static_cast<uintptr_t>(0xdeadbeef));
     rc = fn_attach(fake_engine);
     EXPECT_EQ(rc, 0) << "censor_attach_engine returned error " << rc;
@@ -166,12 +167,12 @@ TEST(SmokeDlopen, LoadAndExerciseAllExports)
     /* 5. Callback accounting — checked after both shutdown calls so the counts
      *    are final (shutdown itself may emit a log, which is fine to include).
      *    log: at least once (init + attach each log at INFO).
-     *    on_censor_fatal: exactly once (Phase 3 stub fires during attach). */
+     *    on_censor_fatal: zero — v1.1 real pipeline does not fire fatal on
+     *    a clean attach (Phase 3 stub behaviour was removed by Censor-x7d). */
     EXPECT_GT(g_log_count.load(), 0)
         << "log callback was never called — expected at least one INFO message";
-    EXPECT_EQ(g_fatal_count.load(), 1)
-        << "on_censor_fatal should fire exactly once during attach_engine "
-           "(Phase 3 stub behaviour)";
+    EXPECT_EQ(g_fatal_count.load(), 0)
+        << "on_censor_fatal must NOT fire during a clean attach_engine in v1.1";
 
     /* 6. Unload. */
     dll_close(h);

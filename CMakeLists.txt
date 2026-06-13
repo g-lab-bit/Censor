@@ -121,9 +121,6 @@ if(CENSOR_BUILD_TESTS)
 
     add_executable(test_poison_banner
         tests/test_poison_banner.cpp
-        # Include the plugin sources directly so tests can access internals
-        # through the public header without needing the shared library load path.
-        src/censor_plugin.cpp
     )
 
     target_include_directories(test_poison_banner PRIVATE
@@ -131,7 +128,10 @@ if(CENSOR_BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
 
+    # ce-hcy: link the DLL so CENSOR_API resolves to dllimport.
+    target_compile_definitions(test_poison_banner PRIVATE CENSOR_USE_DLL)
     target_link_libraries(test_poison_banner PRIVATE
+        censor
         GTest::gtest_main
     )
 
@@ -283,5 +283,39 @@ if(CENSOR_BUILD_TESTS)
         GTest::gtest_main
     )
     gtest_discover_tests(test_test_utils)
+
+    # ---------------------------------------------------------------------------
+    # test_pipeline — Censor-x7d: pipeline consumer unit test.
+    #
+    # Compiles the pipeline sources directly (like test_clustering) so it can
+    # call the non-exported process_page() internal symbol.
+    #
+    # When RAPIDA_PUBLIC_INCLUDE is set, CENSOR_HAVE_RAPIDA_SHIM is inherited
+    # from the censor target compile definitions; we propagate it here too so
+    # the #if guards in page_pipeline.h/.cpp and test_pipeline.cpp agree.
+    # When the shim is absent the test compiles a no-op stub (StandaloneNoOpPass).
+    # ---------------------------------------------------------------------------
+    add_executable(test_pipeline
+        tests/test_pipeline.cpp
+        src/pipeline/page_pipeline.cpp
+        src/clustering/feature_vector.cpp
+        src/clustering/spatial_clustering.cpp
+        src/clustering/stroke_weight_histogram.cpp
+        src/classifier/knn_classifier.cpp
+        src/overlay/confidence_overlay.cpp
+    )
+    target_include_directories(test_pipeline PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests
+    )
+    if(RAPIDA_PUBLIC_INCLUDE AND EXISTS "${RAPIDA_PUBLIC_INCLUDE}/rapida_vector_engine_c.h")
+        target_include_directories(test_pipeline PRIVATE "${RAPIDA_PUBLIC_INCLUDE}")
+        target_compile_definitions(test_pipeline PRIVATE CENSOR_HAVE_RAPIDA_SHIM=1)
+    endif()
+    target_link_libraries(test_pipeline PRIVATE
+        GTest::gtest_main
+    )
+    gtest_discover_tests(test_pipeline)
 
 endif()
