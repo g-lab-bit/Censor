@@ -37,7 +37,10 @@ Based on original Vector Classifier spec §6, §8.
 ### Cell Click → Popout
 
 - Click a grid cell → popout window appears.
-- Popout is an independent ImGui window showing just that cell's contents.
+- Popout is an in-app floating panel (Option B — ra-mtnhg decision 2026-06-17)
+  showing just that cell's contents. NOT a separate OS window and NOT ImGui
+  (ImGui was removed in ra-mf7b4; Electron is Rapida's sole UI shell). Factored so
+  it can be promoted to a real BrowserWindow later if ra-b2c0t.5 multi-window lands.
 - Resize and zoom the popout independently of the main canvas.
 - Clusters in the popout are clickable for labeling.
 - Dismiss popout: Esc or click outside.
@@ -212,7 +215,7 @@ Progress without being intrusive. Data from Censor's SQLite
 ### Phase 1 — Grid + Palette (no classifier)
 
 - [ ] TASK-CUI-001: Implement grid overlay rendering — 1px lines at 30% opacity, zoom-independent, cell highlight on hover/click.
-- [ ] TASK-CUI-002: Implement cell popout window — independent ImGui window, shows cell contents at larger scale, cluster outlines clickable.
+- [ ] TASK-CUI-002: Implement cell popout — in-app floating panel (Option B, ra-mtnhg), shows cell contents at larger scale, cluster outlines clickable.
 - [ ] TASK-CUI-003: Implement label palette — floating toolbar, 9 default classes + Custom, hotkey activation, progress bars, color swatches.
 - [ ] TASK-CUI-004: Wire shift-click labeling — palette active class + cluster click → `censor_label_cluster()` call, overlay refresh.
 - [ ] TASK-CUI-005: Implement continuous click mode — add/remove toggle with shift, green/red indicator, box drag multi-select.
