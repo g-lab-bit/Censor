@@ -17,6 +17,10 @@
 #include <stdint.h>
 
 #ifdef __cplusplus
+/* ra-dfw5r — for the ABI-guard static_asserts below. Outside extern "C" so the
+ * std:: headers aren't pulled into C linkage. */
+#include <type_traits>
+#include <cstddef>
 extern "C" {
 #endif
 
@@ -101,6 +105,21 @@ typedef struct RapidaHostCallbacks {
      * while NULL.  See rapida_vector_engine_c.h for the table definition. */
     const struct RapidaVectorEngineApi* vector_engine_api;
 } RapidaHostCallbacks;
+
+/* ABI guard (ra-dfw5r). Censor declares RapidaHostCallbacks standalone — by
+ * design, this header is independently buildable and never includes Rapida's
+ * tree — so it can't share Rapida's static_assert (censor_loader.h). Mirror it
+ * here so a non-POD change, a reordered field, or a v1.1 field inserted before
+ * user_data is caught at compile time on a Censor build, not at runtime across
+ * the DLL boundary. Both sides follow SPEC-censor-integration; these asserts
+ * make the "append-only, stays POD" discipline machine-checked on this side. */
+#ifdef __cplusplus
+static_assert(std::is_standard_layout<RapidaHostCallbacks>::value,
+              "RapidaHostCallbacks must stay standard-layout for the C ABI boundary");
+static_assert(offsetof(RapidaHostCallbacks, invalidate_overlay) >
+                  offsetof(RapidaHostCallbacks, user_data),
+              "ABI v1.1 fields must be appended AFTER user_data (append-only ordering)");
+#endif
 
 /* ---------------------------------------------------------------------------
  * Engine handle
